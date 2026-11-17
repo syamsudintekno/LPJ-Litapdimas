@@ -1,0 +1,27 @@
+body {
+  margin: 24px auto;
+  padding: 0 16px;
+  max-width: 44rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font: 1rem/1.5 Inter, system-ui, sans-serif;
+}
+
+h1 { font-size: 24px; }
+label { display: block; margin-top: 16px; }
+input, button {
+  box-sizing: border-box;
+  font: inherit;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+input { width: 100%; }
+button { margin: 8px 4px 4px 0; }
+button[type=submit] { background: #115e59; color: white; }
+button:disabled { opacity: .65; }
+:focus-visible { outline: 2px solid #115e59; outline-offset: 2px; }
+#google-sign-in { margin: 16px 0; }
+#detail { overflow-wrap: anywhere; white-space: pre-wrap; }

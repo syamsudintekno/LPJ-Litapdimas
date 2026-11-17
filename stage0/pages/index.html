@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Uji akses LPJ Litapdimas</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://accounts.google.com/gsi/client" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Uji akses LPJ Litapdimas</h1>
+    <div id="google-sign-in"></div>
+    <section id="actions" hidden aria-label="Pemeriksaan akses proyek">
+      <button id="sign-out" type="button">Keluar</button>
+      <button id="refresh" type="button">Muat daftar proyek</button>
+      <ul id="projects" aria-label="Proyek yang dapat diakses"></ul>
+      <form id="probe">
+        <label for="project-id">ID proyek untuk uji RPC</label>
+        <input id="project-id" required>
+        <button type="submit" value="projects.get">Baca proyek</button>
+        <button type="submit" value="stage0.write_probe">Uji hak tulis</button>
+        <button type="submit" value="taxes.verify">Uji hak verifikasi pajak</button>
+      </form>
+    </section>
+    <p id="result" role="status">Memuat konfigurasi uji…</p>
+    <div id="detail"></div>
+  </main>
+</body>
+</html>

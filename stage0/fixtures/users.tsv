@@ -1,0 +1,4 @@
+user_id	login_email	system_role	active
+10000000-0000-4000-8000-000000000001	pemilik@example.test	OWNER	TRUE
+10000000-0000-4000-8000-000000000002	anggota-a@example.test	MEMBER	TRUE
+10000000-0000-4000-8000-000000000003	anggota-b@example.test	MEMBER	TRUE

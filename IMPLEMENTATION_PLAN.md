@@ -4,7 +4,7 @@ Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHI
 
 | Urutan | Hasil | Pemeriksaan sebelum dinyatakan selesai |
 | --- | --- | --- |
-| 0. Uji akses dan hosting | Bukti bahwa akun kampus bisa masuk melalui konfigurasi kandidat dan akses proyek ditegakkan server | Matriks uji di bawah. Catat konfigurasi, hasil, serta keputusan hosting di arsitektur. |
+| 0. Uji akses dari GitHub Pages | Bukti bahwa akun Google yang diundang bisa masuk dari `github.io` dan akses proyek ditegakkan server | Matriks uji di bawah. Catat konfigurasi layanan, hasil, dan keputusan transport di arsitektur. |
 | 1. Proyek dan personel | Wizard, Master Personel, impor dengan pratinjau, dan versi RAB. LPJ-01–03, fondasi LPJ-09 | Isian wajib menahan aktivasi. Impor ulang tidak menduplikasi orang. Revisi menghasilkan versi baru dan riwayat versi sebelumnya dapat dilihat. |
 | 2. Satu kegiatan lengkap | Kegiatan, agenda, daftar peserta dan distribusi, logbook. LPJ-04 | Satu fixture FGD menghasilkan rundown, logbook, daftar hadir serta daftar distribusi dari ID kegiatan yang sama. Status hadir dan distribusi dapat berbeda. |
 | 3. Transaksi, pajak, dan tahap | Verifikasi bukti oleh pemilik, kwitansi, pencairan dan rekap tahap. LPJ-05–07 | Uji contoh pada bagian berikut, dua permintaan terpisah yang bersamaan, serta percobaan ulang request yang sama. |
@@ -12,18 +12,18 @@ Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHI
 
 ## Uji akses dan hosting
 
-Mulai dari Apps Script HTML Service sebagai kandidat dan Google Sheets berisi data sintetis. Gunakan satu akun pemilik, dua akun anggota peneliti, satu akun luar bila diizinkan, dan dua proyek uji dari tahun berbeda. Catat strategi eksekusi, kontrol akses deployment, serta kebutuhan izin Sheets dan Drive tanpa menyimpan email atau ID berkas asli di GitHub.
+Uji antarmuka dari GitHub Pages dengan Apps Script sebagai kandidat layanan server dan Google Sheets privat berisi data sintetis. Jalankan uji tanpa mengaktifkan billing. Gunakan satu akun pemilik, dua akun anggota peneliti, satu akun Google tanpa undangan, dan dua proyek uji dari tahun berbeda. Catat cara layanan memverifikasi identitas, konfigurasi akses dari origin GitHub Pages, serta kebutuhan izin Sheets dan Drive. Simpan email akun uji dan ID berkas di lingkungan privat.
 
 | Kasus | Hasil yang harus diamati |
 | --- | --- |
-| Akun kampus A diberi akses Proyek A | Server mengenali akun dan memberi data Proyek A sesuai perannya. |
-| Akun kampus B diberi akses Proyek B dan meminta ID Proyek A langsung melalui RPC | Ditolak. Otorisasi berlaku di server pada setiap panggilan. |
+| Akun Google A diberi akses Proyek A | Server mengenali akun dan memberi data Proyek A sesuai perannya. |
+| Akun Google B diberi akses Proyek B dan meminta ID Proyek A langsung melalui RPC | Ditolak. Otorisasi berlaku di server pada setiap panggilan. |
 | Anggota peneliti meminta verifikasi pajak | Ditolak meski request dikirim langsung. |
 | Akses anggota dicabut setelah proyek selesai | Permintaan baru, termasuk dengan tautan lama, ditolak. Jika hak diturunkan ke baca saja, permintaan tulis ditolak. |
 | Identitas kosong atau akun luar yang tidak berwenang | Ditolak. |
 | Akun anggota membuka URL Sheets atau folder bukti secara langsung | Hak langsung terbatas sesuai peran. Anggota tidak dapat menggunakan akses file untuk melewati pembatasan proyek. |
 
-Jika kandidat gagal, dokumentasikan konfigurasi dan hasil yang gagal, lalu evaluasi opsi hosting/identitas sebelum membuat transport produksi. Paket UI dan pengujian domain dengan fixture dapat berjalan sambil uji akun berlangsung.
+Jika kandidat layanan gagal, dokumentasikan konfigurasi dan hasil yang gagal, lalu evaluasi transport atau mekanisme identitas. Uji lokal dengan fixture dapat berjalan sambil uji akun berlangsung.
 
 ## Contoh penerimaan finansial
 

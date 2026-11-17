@@ -4,6 +4,8 @@ Rujukan cakupan dan istilah ada di [PRD.md](PRD.md). Nama field dan status tekni
 
 ## Sistem visual
 
+Prototipe awal HTML Service memakai panel uji dengan token warna dasar. Sistem visual berikut berlaku untuk UI aplikasi di GitHub Pages.
+
 Gunakan React, komponen internal, **CSS Modules**, dan **Lucide React** untuk ikon. Gunakan **Inter** dengan fallback system-ui. Simpan token di `src/styles/tokens.css`, aturan global di `globals.css`, dan aturan cetak di `print.css`. Aturan komponen berada di file `*.module.css`. Hindari inline CSS dan penambahan UI kit atau paket ikon kedua. Gunakan atribut data atau kelas untuk variasi status dan ukuran.
 
 | Token | Nilai | Penggunaan |

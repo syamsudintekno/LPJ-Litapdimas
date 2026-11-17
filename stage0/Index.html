@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body { margin: 24px auto; padding: 0 16px; max-width: 44rem; background: #F8FAFC;
+      color: #0F172A; font: 1rem/1.5 Inter, system-ui, sans-serif; }
+    h1 { font-size: 24px; }
+    label { display: block; margin-top: 16px; }
+    input, button { box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid #CBD5E1;
+      border-radius: 8px; background: #fff; color: #0F172A; }
+    input { width: 100%; }
+    button { margin: 4px 4px 4px 0; }
+    button[type=submit] { background: #115E59; color: white; }
+    :focus-visible { outline: 2px solid #115E59; outline-offset: 2px; }
+    [data-error=true] { color: #B91C1C; }
+    #detail { overflow-wrap: anywhere; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Uji akses LPJ Litapdimas</h1>
+    <button id="refresh" type="button">Muat ulang daftar proyek</button>
+    <ul id="projects" aria-label="Proyek yang dapat diakses"></ul>
+    <form id="probe">
+      <label for="project_id">ID proyek untuk uji RPC</label>
+      <input id="project_id" name="project_id" required>
+      <button type="submit" value="projects.get">Baca proyek</button>
+      <button type="submit" value="stage0.write_probe">Uji hak tulis</button>
+      <button type="submit" value="taxes.verify">Uji hak verifikasi pajak</button>
+    </form>
+    <p id="status" role="status"></p>
+    <div id="detail"></div>
+  </main>
+  <script>
+    const form = document.querySelector('#probe');
+    const projectId = document.querySelector('#project_id');
+    const projects = document.querySelector('#projects');
+    const status = document.querySelector('#status');
+    const detail = document.querySelector('#detail');
+    const refresh = document.querySelector('#refresh');
+
+    function rpc(action, id) {
+      const request = {api_version: 1, action, request_id: crypto.randomUUID()};
+      if (id) request.project_id = id;
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).dispatch(request);
+      });
+    }
+
+    async function run(action, id) {
+      detail.textContent = '';
+      if (action === 'projects.list') projects.replaceChildren();
+      status.dataset.error = 'false';
+      status.textContent = 'Memeriksa akses…';
+      const buttons = document.querySelectorAll('button');
+      buttons.forEach(button => { button.disabled = true; });
+      try {
+        const response = await rpc(action, id);
+        if (!response.ok) {
+          status.dataset.error = 'true';
+          status.textContent = response.error.code + ' · ' + response.error.message;
+          return;
+        }
+
+        if (action === 'projects.list') {
+          for (const project of response.data.projects) {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = project.fiscal_year + ' · ' + project.title;
+            button.addEventListener('click', () => {
+              projectId.value = project.project_id;
+              run('projects.get', project.project_id);
+            });
+            item.append(button);
+            projects.append(item);
+          }
+          status.textContent = projects.childElementCount ? 'Daftar proyek dimuat.' : 'Belum ada proyek yang dapat diakses.';
+        } else if (action === 'projects.get') {
+          const {project, access_role, personnel} = response.data;
+          detail.textContent = [
+            project.fiscal_year + ' · ' + project.title,
+            'Hak akses: ' + access_role,
+            ...personnel.map(person => person.assignment_role + ' · ' + person.display_name),
+          ].join('\n');
+          status.textContent = 'Proyek dapat dibaca.';
+        } else {
+          status.textContent = 'Pemeriksaan hak akses berhasil. Data tetap utuh.';
+        }
+      } catch {
+        status.dataset.error = 'true';
+        status.textContent = 'Koneksi RPC gagal.';
+      } finally {
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    }
+
+    refresh.addEventListener('click', () => run('projects.list'));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      run(event.submitter?.value ?? 'projects.get', projectId.value.trim());
+    });
+    google.script.url.getLocation(location => {
+      projectId.value = location.parameter.project_id ?? '';
+      run(projectId.value ? 'projects.get' : 'projects.list', projectId.value);
+    });
+  </script>
+</body>
+</html>

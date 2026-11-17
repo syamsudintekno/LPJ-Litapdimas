@@ -1,0 +1,39 @@
+name: Publish Stage 0 test page
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - name: Configure test endpoint
+        env:
+          APPS_SCRIPT_URL: ${{ vars.STAGE0_APPS_SCRIPT_URL }}
+          GOOGLE_CLIENT_ID: ${{ vars.STAGE0_GOOGLE_CLIENT_ID }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const apps_script_url = process.env.APPS_SCRIPT_URL;
+          const google_client_id = process.env.GOOGLE_CLIENT_ID;
+          if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(apps_script_url) ||
+              !/^[\w-]+\.apps\.googleusercontent\.com$/.test(google_client_id)) {
+            throw new Error('Configure STAGE0_APPS_SCRIPT_URL and STAGE0_GOOGLE_CLIENT_ID in repository variables.');
+          }
+          fs.writeFileSync('stage0/pages/config.json', JSON.stringify({apps_script_url, google_client_id}));
+          NODE
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: stage0/pages
+      - id: deployment
+        uses: actions/deploy-pages@v4

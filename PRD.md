@@ -39,4 +39,4 @@ Di luar v1: portal publik, pencairan dana dari aplikasi, integrasi Litapdimas/Co
 
 - Verifikasi perlakuan pajak konsumsi/snack serta dokumen yang perlu memuat penandatangan selain aturan tetap PPK dan bendahara pada kwitansi.
 - Cocokkan format cetak, jadwal FGD dan referensi ekspose dengan dokumen sumber sebelum pengesahan template.
-- Uji identitas dan otorisasi aplikasi dengan akun kampus sebelum menetapkan cara hosting. Rancangan dan kontrak teknis ada di [ARCHITECTURE.md](ARCHITECTURE.md). Aturan antarmuka ada di [DESIGN.md](DESIGN.md).
+- Uji identitas akun Google dan otorisasi per proyek dari antarmuka GitHub Pages sebelum memakai data LPJ. Data tabel tersimpan di Google Sheets privat. Rancangan dan kontrak teknis ada di [ARCHITECTURE.md](ARCHITECTURE.md). Aturan antarmuka ada di [DESIGN.md](DESIGN.md).
