@@ -30,7 +30,7 @@ Skala jarak 4, 8, 12, 16, 24, 32, 48 px. Radius elemen 8 px, panel 12 px. Ukuran
 | SetupWizard | Langkah Identitas → Tim → Pejabat → Tahap LPJ → Tinjau. Tombol kembali mempertahankan draf. Ringkasan menampilkan data yang harus dilengkapi sebelum aktivasi. |
 | DataTable | Header semantik, filter eksplisit dan navigasi halaman. Pada ponsel, tabel padat boleh bergulir horizontal dalam wrapper berlabel. Utamakan kolom identitas, status, dan nominal. |
 | ImportPreview | Tampilkan valid, duplikat dan perlu koreksi dengan nomor baris. Pisahkan pratinjau dari tindakan impor. |
-| TaxSummary | Tampilkan nominal kwitansi, potongan, tambahan pajak bila ada, dan jumlah diterima dengan label tersendiri. Bendahara dapat melihat dasar aturan, penanda verifikasi, bukti dan alasan koreksi. |
+| TaxSummary | Tampilkan nominal kwitansi, potongan, tambahan pajak bila ada, dan jumlah diterima dengan label tersendiri. Pemilik dapat memeriksa dasar aturan, penanda verifikasi, bukti dan alasan koreksi. |
 | StatusBadge dan Notice | Label teks untuk Draf, Perlu verifikasi, Terverifikasi, dan Final. Kesalahan simpan tetap terlihat sampai ditangani. |
 | DocumentPreview | Tampilkan tahap, tanggal batas, versi dokumen dan kelengkapan. Gunakan halaman A4, ulangi header tabel bila perlu, dan periksa blok tanda tangan serta pemenggalan baris. Tampilan cetak menghilangkan navigasi dan tombol. |
 
