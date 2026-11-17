@@ -9,6 +9,8 @@
 
 ## Aturan implementasi
 
+- Akun aplikasi hanya untuk pemilik dan anggota peneliti yang diundang. Verifikasi bukti, pengelolaan aturan pajak, dan finalisasi dilakukan pemilik. PPK, Bendahara Pengeluaran, dan mahasiswa adalah personel LPJ tanpa akses aplikasi.
+
 - Jaga kalkulasi finansial, verifikasi pajak, kontrol akses, dan status final di server. UI memanggil adapter RPC.
 - Gunakan nama dan tipe dari kontrak. Simpan uang dalam rupiah integer, persentase dalam basis point, dan ID sebagai teks.
 - Rekap 100% kumulatif dan menghitung transaksi terkonfirmasi satu kali. Setoran pajak dilacak terhadap transaksi asal. Kwitansi memuat PPK dan Bendahara Pengeluaran dari proyek terkait.
