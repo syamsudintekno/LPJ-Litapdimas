@@ -35,7 +35,7 @@ Setiap baris di bawah adalah satu tab logis. Kolom pertama adalah PK kecuali din
 | Sheet | Kolom domain utama |
 | --- | --- |
 | users | user_id, login_email, system_role, active |
-| project_members | project_member_id, project_id, user_id, project_role. Unik project_id + user_id |
+| project_members | project_member_id, project_id, user_id, project_role, revoked_at opsional. Unik project_id + user_id |
 | people | person_id, person_kind, display_name, nip, nim, unit_name, civil_service_grade, active |
 | payees | payee_id, payee_kind, person_id opsional, legal_name, tax_profile_ref. Vendor badan dan kelompok peserta dapat memakai entri sendiri |
 | projects | project_id, fiscal_year, title, project_code, official_ceiling_amount, status, active_budget_version_id |
@@ -106,26 +106,26 @@ Satu adapter UI mengirim objek ke controller `dispatch`. Controller menerima act
 | Action | Masukan utama | Keluaran dan akses |
 | --- | --- | --- |
 | projects.list / projects.get | cursor, limit / project_id | Proyek dalam cakupan pengguna |
-| projects.save / projects.activate | data wizard / project_id dan versi | Admin/pengelola proyek. Aktivasi memeriksa kelengkapan peran |
-| people.search / people.preview_import / people.commit_import | query / baris dari CSV atau XLSX / import_token | Pencarian sesuai akses. Impor admin menghasilkan ringkasan dan konflik |
-| budgets.save_version / budgets.approve_version | kategori dan item / budget_version_id | Operator menyusun draf. Pengelola menyetujui versi |
-| activities.save / participants.preview_import / participants.commit_import / distributions.save / logbook.save | data kegiatan, agenda, peserta, distribusi, logbook | Operator/pengelola proyek |
-| disbursements.save | report_stage_id, received_date, received_amount, attachment_id | Bendahara |
-| transactions.list / transactions.save | filter / rincian transaksi, pembayaran, penerima, bukti | Pembaca berwenang / operator |
-| taxes.save_rule_version / taxes.preview / taxes.verify | aturan / payment_detail_id / assessment, hasil dan alasan koreksi jika ada | Kelola dan verifikasi oleh bendahara. Preview tersedia bagi operator |
-| tax_remittances.save | paid_at, amount, allocation dan bukti | Bendahara. Alokasi tidak melebihi potongan terkait |
-| transactions.confirm / receipts.issue | transaction_id / payment_detail_id | Bendahara. Konfirmasi dan penerbitan mengembalikan versi atau nomor bukti |
-| stages.save / reports.preview / reports.finalize | konfigurasi / report_stage_id, document_kind / pilihan paket dan versi sumber | Pengelola. Finalisasi menghasilkan referensi PDF dan snapshot |
+| projects.save / projects.activate | data wizard / project_id dan versi | Pemilik. Aktivasi memeriksa kelengkapan peran |
+| people.search / people.preview_import / people.commit_import | query / baris dari CSV atau XLSX / import_token | Pencarian sesuai akses. Impor oleh pemilik menghasilkan ringkasan dan konflik |
+| budgets.save_version / budgets.approve_version | kategori dan item / budget_version_id | Anggota dengan hak edit menyusun draf. Pemilik mencatat versi yang disetujui |
+| activities.save / participants.preview_import / participants.commit_import / distributions.save / logbook.save | data kegiatan, agenda, peserta, distribusi, logbook | Pemilik atau anggota dengan hak edit pada proyek |
+| disbursements.save | report_stage_id, received_date, received_amount, attachment_id | Pemilik |
+| transactions.list / transactions.save | filter / rincian transaksi, pembayaran, penerima, bukti | Pembaca berwenang / anggota dengan hak edit pada proyek |
+| taxes.save_rule_version / taxes.preview / taxes.verify | aturan / payment_detail_id / assessment, hasil dan alasan koreksi jika ada | Kelola dan verifikasi oleh pemilik. Preview tersedia bagi anggota dengan hak edit |
+| tax_remittances.save | paid_at, amount, allocation dan bukti | Pemilik. Alokasi tidak melebihi potongan terkait |
+| transactions.confirm / receipts.issue | transaction_id / payment_detail_id | Pemilik. Konfirmasi dan penerbitan mengembalikan versi atau nomor bukti |
+| stages.save / reports.preview / reports.finalize | konfigurasi / report_stage_id, document_kind / pilihan paket dan versi sumber | Pemilik menetapkan tahap dan finalisasi. Pratinjau tersedia bagi anggota yang punya akses |
 | attachments.link / attachments.get | konteks dan file Drive yang sudah diotorisasi / attachment_id | Hak akses mengikuti proyek dan berkas |
-| audit.list | project_id, cursor, limit | Admin dan peninjau yang diberi akses |
+| audit.list | project_id, cursor, limit | Pemilik |
 
 Gunakan `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `CONFLICT`, `TAX_REVIEW_REQUIRED`, dan `TEMPORARY_FAILURE` untuk kegagalan yang dapat ditangani klien. Pratinjau impor menghasilkan token berumur terbatas, terikat pengguna dan isi batch. Commit memeriksa ulang duplikasi dan hak akses.
 
 ## Integritas dan operasi
 
-- Peran sistem `ADMIN` dan `USER`. Akses proyek memakai `MANAGER`, `OPERATOR`, `TREASURER`, atau `VIEWER`. Penandatangan dokumen berasal dari `project_people` dan berbeda dari pemberian hak aplikasi. Akun tanpa identitas tepercaya ditolak.
-- Status inti: proyek `DRAFT / ACTIVE / ARCHIVED`, RAB `DRAFT / APPROVED / SUPERSEDED`, transaksi `DRAFT / CONFIRMED / VOID`, pajak `PENDING / VERIFIED / NOT_APPLICABLE`, kwitansi `ISSUED / VOID`, tahap `DRAFT / FINALIZED`. `NOT_APPLICABLE` dicatat oleh bendahara. Koreksi dokumen final diterbitkan sebagai versi baru dengan jejak audit.
-- Hitung target dari plafon dan `target_bps`. Realisasi kumulatif menjumlahkan `receipt_amount` untuk rincian transaksi `CONFIRMED` sampai tanggal batas yang inklusif. `receipt_amount` adalah nilai yang disahkan sebagai dasar LPJ dari kwitansi. `net_paid_amount` adalah pembayaran ke penerima. Untuk honor, netto sama dengan nilai bruto dikurangi potongan. Untuk vendor, rekonsiliasi bagian pajak tambahan terhadap bukti tagihan agar bagian yang sudah termasuk dalam nominal kwitansi tidak ditambahkan kembali. Nilai dan status final tunduk pada verifikasi bendahara. Setoran memiliki rekap tersendiri.
+- Peran sistem `OWNER` dan `MEMBER`. Pemilik mengelola semua proyek. Anggota yang diundang memiliki `EDITOR` atau `VIEWER` pada `project_members` untuk tiap proyek yang ditugaskan. Tambahkan `revoked_at` untuk pencabutan. Server mengecek akun aktif, proyek, dan hak pada setiap RPC serta akses lampiran. PPK, Bendahara Pengeluaran, dan mahasiswa tercatat di `project_people` untuk dokumen LPJ tanpa akun atau hak aplikasi. Akun tanpa identitas tepercaya ditolak.
+- Status inti: proyek `DRAFT / ACTIVE / ARCHIVED`, RAB `DRAFT / APPROVED / SUPERSEDED`, transaksi `DRAFT / CONFIRMED / VOID`, pajak `PENDING / VERIFIED / NOT_APPLICABLE`, kwitansi `ISSUED / VOID`, tahap `DRAFT / FINALIZED`. `NOT_APPLICABLE` dicatat oleh pemilik. Koreksi dokumen final diterbitkan sebagai versi baru dengan jejak audit.
+- Hitung target dari plafon dan `target_bps`. Realisasi kumulatif menjumlahkan `receipt_amount` untuk rincian transaksi `CONFIRMED` sampai tanggal batas yang inklusif. `receipt_amount` adalah nilai yang disahkan sebagai dasar LPJ dari kwitansi. `net_paid_amount` adalah pembayaran ke penerima. Untuk honor, netto sama dengan nilai bruto dikurangi potongan. Untuk vendor, rekonsiliasi bagian pajak tambahan terhadap bukti tagihan agar bagian yang sudah termasuk dalam nominal kwitansi tidak ditambahkan kembali. Nilai dan status final tunduk pada verifikasi pemilik berdasarkan bukti. Setoran memiliki rekap tersendiri.
 - Pemilihan versi aturan pajak memakai tanggal transaksi dan profil penerima yang relevan. Ketiadaan aturan, data yang kurang, atau dua aturan yang sama-sama cocok menghasilkan `PENDING`. Data historis 4% konsumsi dan snack tidak menjadi tarif default.
 - Layanan penulisan memakai script lock untuk pemeriksaan versi dan alokasi nomor bukti, serta jurnal permintaan untuk idempotensi. Tulis perubahan Sheet terkait, audit, dan hasil permintaan dalam satu batch atomik pada spreadsheet yang sama. Pemakaian ulang request ID dengan payload berbeda menghasilkan konflik. Penerbitan PDF ke Drive memakai ID operasi dan publikasi metadata final sesudah file dan snapshot tersedia. Operasi parsial dapat dilanjutkan dengan ID yang sama.
-- Isolasi spreadsheet, folder Drive dan konfigurasi produksi. Gunakan akses minimum, cadangan sheet dan file secara berkala, serta uji pemulihan dengan akun admin. Pastikan strategi eksekusi Apps Script membatasi akses langsung ke file sesuai peran. Identitas uji yang kosong, akun eksternal, dan akses lintas proyek harus ditolak sebelum deployment.
+- Isolasi spreadsheet, folder Drive dan konfigurasi produksi. Gunakan akses minimum, cadangan sheet dan file secara berkala, serta uji pemulihan dengan akun pemilik. Pastikan strategi eksekusi Apps Script membatasi akses langsung ke file sesuai peran. Identitas uji yang kosong, akun eksternal, dan akses lintas proyek harus ditolak sebelum deployment.
