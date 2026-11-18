@@ -97,7 +97,8 @@ function dispatch_(request, identify) {
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
       'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
-      'transactions.list', 'transactions.save', 'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify'];
+      'transactions.list', 'transactions.save', 'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
+      'taxes.list_rules', 'taxes.save_rule_version'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -105,6 +106,11 @@ function dispatch_(request, identify) {
 
     const owner = user.system_role === 'OWNER';
     const success = data => ({ok: true, request_id: requestId, data});
+
+    if (['taxes.list_rules', 'taxes.save_rule_version'].includes(request.action)) {
+      if (!owner) return failure('FORBIDDEN', 'Hanya pemilik yang dapat mengelola aturan pajak.');
+      return taxRulesRpc_(spreadsheetId, user, request);
+    }
 
     if (['projects.save', 'projects.activate'].includes(request.action)) {
       if (!owner) return failure('FORBIDDEN', 'Hanya pemilik yang dapat mengelola proyek.');
@@ -239,6 +245,7 @@ function dispatch_(request, identify) {
         system_role: user.system_role,
         can_create_project: owner && PropertiesService.getScriptProperties().getProperty('PROJECT_WRITES_ENABLED') === 'true',
         can_import_people: owner && PropertiesService.getScriptProperties().getProperty('PEOPLE_IMPORT_ENABLED') === 'true',
+        can_manage_tax_rules: owner && PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true',
       });
     }
 

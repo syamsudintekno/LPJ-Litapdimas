@@ -42,8 +42,7 @@ function taxContext_(spreadsheetId, projectId, paymentId, owner) {
   const rules = rows_(spreadsheetId, 'tax_rule_versions', TAX_RULE_FIELDS_).map(taxRule_);
   if (new Set(rules.map(row => row.tax_rule_version_id)).size !== rules.length ||
       new Set(rules.map(row => row.rule_code + ':' + row.version_no)).size !== rules.length) throw new Error('Versi aturan pajak ganda.');
-  const candidates = rules.filter(row => row.expense_kind === transaction.expense_kind && row.payee_kind === payee.payee_kind &&
-    row.effective_from <= transaction.payment_date && (!row.effective_to || row.effective_to >= transaction.payment_date) &&
+  const candidates = taxRulesOnDate_(rules, transaction.payment_date).filter(row => row.expense_kind === transaction.expense_kind && row.payee_kind === payee.payee_kind &&
     (!row.eligibility.civil_service_grades || row.eligibility.civil_service_grades.includes(person?.civil_service_grade)));
   let reason = '';
   if (['CONSUMPTION', 'SNACK'].includes(transaction.expense_kind)) reason = 'CLASSIFICATION_REVIEW_REQUIRED';
@@ -118,6 +117,7 @@ function taxRpc_(spreadsheetId, user, request, role) {
       const proof = old && context.attachments.find(row => row.attachment_id === old.evidence_attachment_id);
       const file = old && evidence.find(row => row.attachment_id === old.evidence_attachment_id);
       const stale = !old || !['VERIFIED', 'NOT_APPLICABLE'].includes(old.status) || old.amount !== payment.withheld_tax_amount ||
+        (old.tax_rule_version_id && !candidates.some(row => row.tax_rule_version_id === old.tax_rule_version_id)) ||
         !proof || proof.row_version !== old.evidence_row_version || proof.drive_file_id !== old.evidence_drive_file_id ||
         (role === 'OWNER' && (!file?.available || file.modified_at !== old.evidence_modified_at));
       const assessment = old ? Object.fromEntries(Object.entries(old).filter(([key]) => role === 'OWNER' || !['evidence_drive_file_id', 'evidence_modified_at'].includes(key))) : null;

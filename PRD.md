@@ -26,6 +26,8 @@ Pemilik mengelola semua proyek, undangan, verifikasi data, dan arsip. Anggota pe
 
 ## Alur utama
 
+Untuk LPJ-06/09, pemilik mengelola aturan global lintas proyek sebagai versi yang tidak ditimpa. Setiap versi memiliki periode inklusif dan referensi. Pada kode sama, versi tertinggi yang mencakup tanggal pembayaran menjadi acuan sebelum pemeriksaan golongan; aturan dari kode berbeda yang sama-sama cocok memerlukan tinjauan. Perubahan aturan tidak otomatis mengubah keputusan terdahulu, tetapi penilaian yang merujuk versi tergantikan perlu ditinjau ulang. Anggota tidak dapat mengelola aturan.
+
 1. Pemilik mengimpor personel dan mengisi wizard LPJ.
 2. Pemilik menyetujui RAB dan mencatat penerimaan dana. Anggota peneliti mengisi kegiatan, peserta, rundown, serta logbook.
 3. Anggota peneliti memasukkan transaksi dan bukti. Pemilik meninjau penerima, nilai kwitansi dan pajak.

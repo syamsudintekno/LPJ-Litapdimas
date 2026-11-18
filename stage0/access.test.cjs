@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -244,6 +244,101 @@ function setupTaxes() {
   return {...env, created, payment, rule, evidenceId, driveId, preview, decision, verify};
 }
 
+function setupRuleEditor() {
+  const env = setupTaxes();
+  const payload = Object.fromEntries(env.sheets.tax_rule_versions[0].slice(1, 12).map((field, index) => [field, env.rule[index + 1]]));
+  delete payload.version_no;
+  payload.eligibility = JSON.parse(payload.eligibility);
+  payload.expected_latest_version = 0;
+  const saveRule = (data = payload, id = randomUUID(), account = env.owner) => env.rpc(account, 'taxes.save_rule_version', undefined, {request_id: id, payload: data});
+  const listRules = (account = env.owner) => env.rpc(account, 'taxes.list_rules', undefined);
+  return {...env, payload, saveRule, listRules};
+}
+
+test('aturan pajak hanya dikelola pemilik, append-only, versi diperiksa dan retry tidak menduplikasi', () => {
+  const {saveRule, listRules, payload, sheets, writes, editor, viewer, rpc, owner, projectA} = setupRuleEditor();
+  assert.equal(listRules(editor).error.code, 'FORBIDDEN');
+  assert.equal(saveRule(payload, randomUUID(), viewer).error.code, 'FORBIDDEN');
+  assert.equal(rpc(owner, 'taxes.save_rule_version', projectA, {payload}).error.code, 'VALIDATION_ERROR');
+  const id = randomUUID();
+  const first = saveRule(payload, id);
+  assert.equal(first.data.version_no, 1);
+  const old = JSON.stringify(sheets.tax_rule_versions[1]);
+  const batches = writes.batches;
+  assert.deepEqual(saveRule(payload, id), first);
+  assert.equal(writes.batches, batches);
+  assert.equal(saveRule({...payload, rate_bps: 600}, id).error.code, 'CONFLICT');
+  assert.equal(saveRule(payload).error.code, 'CONFLICT');
+  const second = saveRule({...payload, expected_latest_version: 1, rate_bps: 600});
+  assert.equal(second.data.version_no, 2);
+  assert.equal(JSON.stringify(sheets.tax_rule_versions[1]), old);
+  assert.equal(listRules().data.rules.length, 2);
+  const audits = sheets.audit_log.slice(1).map(row => Object.fromEntries(sheets.audit_log[0].map((field, index) => [field, row[index]])))
+    .filter(row => row.action === 'taxes.save_rule_version');
+  assert.equal(audits.length, 2);
+  assert.equal(audits[0].project_id, '');
+  assert.equal(JSON.parse(audits[1].change_summary).after.rate_bps, 600);
+});
+
+test('aturan menolak data invalid/perubahan jenis dan gagal batch tidak menerbitkan versi atau jurnal sebagian', () => {
+  const {saveRule, payload, sheets, writes, properties, listRules} = setupRuleEditor();
+  for (const invalid of [{rate_bps: 0.5}, {rate_bps: 10001}, {effective_from: '2026-02-30'}, {effective_to: '2025-12-31'},
+    {source_ref: ' '}, {rule_code: 'lower'}, {eligibility: {unknown: true}}, {eligibility: {civil_service_grades: ['III/a', 'III/a']}},
+    {eligibility: {civil_service_grades: [' ']}}, {expected_latest_version: Number.MAX_SAFE_INTEGER}]) {
+    assert.equal(saveRule({...payload, ...invalid}).error.code, 'VALIDATION_ERROR', JSON.stringify(invalid));
+  }
+  const before = JSON.stringify(sheets);
+  writes.fail = true;
+  assert.equal(saveRule().error.code, 'TEMPORARY_FAILURE');
+  assert.equal(JSON.stringify(sheets), before);
+  writes.fail = false;
+  assert.equal(saveRule().ok, true);
+  assert.equal(saveRule({...payload, expected_latest_version: 1, tax_kind: 'CHANGED_KIND'}).error.code, 'VALIDATION_ERROR');
+  properties.TAXES_ENABLED = 'false';
+  assert.equal(listRules().error.code, 'TEMPORARY_FAILURE');
+});
+
+test('versi aturan dipilih menurut tanggal, mendahului filter golongan, dan penilaian lama tetap tersimpan untuk ditinjau', () => {
+  const {saveRule, payload, preview, verify, decision, sheets, payment} = setupRuleEditor();
+  const first = saveRule().data;
+  assert.equal(preview().data.proposal.amount, 45000);
+  assert.equal(verify(decision()).ok, true);
+  const snapshot = JSON.stringify(sheets.tax_assessments);
+  const staleDecision = decision();
+  assert.equal(saveRule({...payload, expected_latest_version: 1, effective_from: '2026-12-01', rate_bps: 600}).ok, true);
+  assert.equal(preview().data.proposal.tax_rule_version_id, first.tax_rule_version_id);
+  assert.equal(saveRule({...payload, expected_latest_version: 2, effective_from: '2026-11-18', rate_bps: 700}).ok, true);
+  assert.equal(preview().data.proposal.amount, 63000);
+  assert.equal(preview().data.needs_review, true);
+  assert.equal(JSON.stringify(sheets.tax_assessments), snapshot);
+  assert.equal(preview().data.payment.withheld_tax_amount, 45000);
+  assert.equal(verify(staleDecision).error.code, 'CONFLICT');
+  assert.equal(saveRule({...payload, expected_latest_version: 3, eligibility: {civil_service_grades: ['IV/a']}}).ok, true);
+  assert.equal(preview().data.proposal.reason, 'NO_MATCHING_RULE');
+  const paymentDate = sheets.transactions[0].indexOf('payment_date');
+  sheets.transactions[1][paymentDate] = '2026-11-17';
+  // Version 4's period covers this earlier date as well; never fall back to a prior grade condition.
+  assert.equal(preview().data.proposal.reason, 'NO_MATCHING_RULE');
+  assert.equal(saveRule({...payload, rule_code: 'SECOND_SYNTHETIC', eligibility: {}}).ok, true);
+  assert.equal(preview().data.proposal.amount, 45000);
+  assert.ok(payment.payment_detail_id);
+});
+
+test('batas tanggal versi inklusif dan versi lama hanya kembali menjadi acuan di luar periode versi baru', () => {
+  const {saveRule, payload, sheets, preview} = setupRuleEditor();
+  const old = saveRule().data;
+  const next = saveRule({...payload, expected_latest_version: 1, effective_from: '2026-11-18', effective_to: '2026-11-19', rate_bps: 600}).data;
+  const dateColumn = sheets.transactions[0].indexOf('payment_date');
+  for (const [date, id, amount] of [['2026-11-17', old.tax_rule_version_id, 45000],
+    ['2026-11-18', next.tax_rule_version_id, 54000], ['2026-11-19', next.tax_rule_version_id, 54000],
+    ['2026-11-20', old.tax_rule_version_id, 45000]]) {
+    sheets.transactions[1][dateColumn] = date;
+    const result = preview().data.proposal;
+    assert.equal(result.tax_rule_version_id, id, date);
+    assert.equal(result.amount, amount, date);
+  }
+});
+
 test('pratinjau pajak memakai tanggal/golongan, menghindari aturan tumpang tindih, dan menghitung basis point tanpa overflow', () => {
   const {preview, sheets, rule, taxAmount, editor, viewer, driveReads} = setupTaxes();
   assert.equal(taxAmount(900000, 500), 45000);
@@ -266,6 +361,7 @@ test('pratinjau pajak memakai tanggal/golongan, menghindari aturan tumpang tindi
   assert.deepEqual(driveReads, []);
   assert.equal(preview(viewer).error.code, 'FORBIDDEN');
   sheets.tax_rule_versions.push([randomUUID(), ...rule.slice(1)]);
+  sheets.tax_rule_versions[2][1] = 'OTHER_SYNTHETIC_HONOR';
   sheets.tax_rule_versions[2][2] = 2;
   assert.equal(preview().data.proposal.reason, 'OVERLAPPING_RULES');
   assert.equal(preview().data.proposal.amount, null);

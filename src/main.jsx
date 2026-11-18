@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Trash2, Users} from './components/ui/Icons.jsx';
+import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, ShieldCheck, Trash2, Users} from './components/ui/Icons.jsx';
 import {callProjectRpc, loadConfig, loadGoogleSignIn} from './rpc.js';
 import {PeopleDirectory} from './features/people/PeopleDirectory.jsx';
 import {ProjectWizard} from './features/projects/ProjectWizard.jsx';
@@ -9,6 +9,7 @@ import {BudgetWorkspace} from './features/budgets/BudgetWorkspace.jsx';
 import {ActivityWorkspace} from './features/activities/ActivityWorkspace.jsx';
 import {LogbookWorkspace} from './features/logbook/LogbookWorkspace.jsx';
 import {TransactionWorkspace} from './features/transactions/TransactionWorkspace.jsx';
+import {TaxRulesWorkspace} from './features/taxes/TaxRulesWorkspace.jsx';
 import litapdimasLogo from './assets/login/litapdimas.png';
 import syekhWasilLogo from './assets/login/syekh-wasil.png';
 import './styles/tokens.css';
@@ -24,7 +25,7 @@ function Brand() {
   </div>;
 }
 
-function AppShell({children, onSignOut, canManagePeople}) {
+function AppShell({children, onSignOut, canManagePeople, canManageTaxRules}) {
   const [sidebarOpen, setSidebarOpen] = useState(() => matchMedia('(min-width: 861px)').matches);
   const [section, setSection] = useState(() => location.hash.slice(1) || 'ringkasan');
 
@@ -46,6 +47,9 @@ function AppShell({children, onSignOut, canManagePeople}) {
         </a>
         {canManagePeople && <a href="#master-personel" aria-current={section === 'master-personel' ? 'location' : undefined} onClick={() => navigate('master-personel')}>
           <Users size={18} aria-hidden="true" /> Master Personel
+        </a>}
+        {canManageTaxRules && <a href="#aturan-pajak" aria-current={section === 'aturan-pajak' ? 'location' : undefined} onClick={() => navigate('aturan-pajak')}>
+          <ShieldCheck size={18} /> Aturan pajak
         </a>}
       </nav>
     </aside>
@@ -260,9 +264,10 @@ function Workspace({endpoint, token, expire, onSignOut}) {
     </section>
     {canManagePeople && <PeopleDirectory endpoint={endpoint} token={token} expire={expire}
       canImport={list.data.can_import_people === true} />}
+    {list?.data?.can_manage_tax_rules === true && <TaxRulesWorkspace endpoint={endpoint} token={token} expire={expire} />}
   </main>;
 
-  return <AppShell onSignOut={onSignOut} canManagePeople={canManagePeople}>
+  return <AppShell onSignOut={onSignOut} canManagePeople={canManagePeople} canManageTaxRules={list?.data?.can_manage_tax_rules === true}>
     {content}
   </AppShell>;
 }
