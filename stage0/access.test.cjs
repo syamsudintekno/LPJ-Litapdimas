@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -110,6 +110,74 @@ function setup() {
   }
   return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes};
 }
+
+test('kegiatan dan rundown terikat proyek, disimpan atomik, serta tidak terduplikasi saat retry', () => {
+  const {rpc, owner, editor, viewer, projectA, projectB, sheets, properties, writes} = setup();
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.projects[0].push('status');
+  sheets.projects.slice(1).forEach(row => row.push('ACTIVE'));
+  sheets.activities = [['activity_id', 'project_id', 'activity_kind', 'title', 'activity_date', 'location', 'status', ...stamp]];
+  sheets.agenda_items = [['agenda_item_id', 'activity_id', 'start_time', 'end_time', 'title', 'speaker_person_id', ...stamp]];
+  sheets.audit_log = [['audit_id', 'request_id', 'user_id', 'project_id', 'action', 'entity_type', 'entity_id', 'occurred_at', 'change_summary']];
+  sheets.mutation_requests = [['request_id', 'user_id', 'action', 'payload_digest', 'result_ref', 'status', ...stamp]];
+  const payload = {
+    activity: {activity_kind: 'FGD', title: '=FGD sintetis', activity_date: '2026-11-18', location: 'Ruang uji'},
+    agenda: [
+      {start_time: '09:00', end_time: '10:00', title: 'Pembukaan', speaker_person_id: sheets.people[1][0]},
+      {start_time: '10:00', end_time: '11:00', title: 'Diskusi'},
+    ],
+  };
+  const request_id = randomUUID();
+  const save = (data = payload, account = editor, project = projectA, id = request_id) =>
+    rpc(account, 'activities.save', project, {request_id: id, payload: data});
+  const list = (account = editor, project = projectA) => rpc(account, 'activities.list', project);
+  assert.equal(list().error.code, 'TEMPORARY_FAILURE');
+  properties.ACTIVITIES_ENABLED = 'true';
+  assert.equal(save(payload, viewer, projectB).error.code, 'FORBIDDEN');
+  assert.equal(save(payload, editor, projectB).error.code, 'FORBIDDEN');
+  assert.equal(list(viewer, projectA).error.code, 'FORBIDDEN');
+  assert.deepEqual(list().data.activities, []);
+  for (const data of [
+    {...payload, activity: {...payload.activity, activity_date: '2026-02-30'}},
+    {...payload, activity: {...payload.activity, title: ' '}},
+    {...payload, activity_id: randomUUID()},
+    {...payload, agenda: [{...payload.agenda[0], start_time: '24:00'}]},
+    {...payload, agenda: [{...payload.agenda[0], end_time: '09:00'}]},
+    {...payload, agenda: [payload.agenda[0], {...payload.agenda[1], start_time: '09:59'}]},
+    {...payload, agenda: [{...payload.agenda[0], speaker_person_id: randomUUID()}]},
+  ]) assert.equal(save(data).error.code, 'VALIDATION_ERROR');
+  writes.locked = true;
+  assert.equal(save().error.code, 'TEMPORARY_FAILURE');
+  writes.locked = false;
+  writes.fail = true;
+  assert.equal(save().error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.activities.length, 1);
+  assert.equal(sheets.agenda_items.length, 1);
+  assert.equal(sheets.audit_log.length, 1);
+  assert.equal(sheets.mutation_requests.length, 1);
+  assert.equal(writes.locked, false);
+  writes.fail = false;
+  const created = save().data;
+  assert.equal(created.status, 'DRAFT');
+  assert.deepEqual(save().data, created);
+  assert.equal(writes.batches, 1);
+  assert.equal(save({...payload, agenda: []}).error.code, 'CONFLICT');
+  assert.equal(save(payload, owner).error.code, 'CONFLICT');
+  assert.equal(list().data.activities[0].title, '=FGD sintetis');
+  const get = (account, project) => rpc(account, 'activities.get', project, {payload: {activity_id: created.activity_id}});
+  const detail = get(editor, projectA).data;
+  assert.equal(detail.agenda.length, 2);
+  assert.ok(detail.agenda.every(item => item.activity_id === created.activity_id));
+  assert.equal(detail.agenda[1].speaker_person_id, '');
+  assert.equal(get(viewer, projectB).error.code, 'NOT_FOUND');
+  sheets.projects[1][4] = 'ARCHIVED';
+  assert.equal(save(payload, editor, projectA, randomUUID()).error.code, 'VALIDATION_ERROR');
+  assert.deepEqual(save().data, created);
+  assert.equal(get(editor, projectA).ok, true);
+  sheets.project_members[1][4] = '2026-11-18T00:00:00Z';
+  assert.equal(save().error.code, 'FORBIDDEN');
+  assert.equal(get(editor, projectA).error.code, 'FORBIDDEN');
+});
 
 test('RAB menghitung rupiah, menjaga riwayat revisi, dan hanya dapat disahkan pemilik', () => {
   const {rpc, owner, editor, viewer, projectA, projectB, sheets, properties, writes} = setup();

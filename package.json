@@ -6,7 +6,8 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "node --test stage0/access.test.cjs src/features/people/readPeopleImport.test.js"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

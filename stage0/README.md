@@ -12,9 +12,7 @@ Gunakan Google Sheet uji privat yang sudah berisi proyek 2023 dan 2025 serta tig
 4. Setelah kode tersedia di branch default repo, pilih **Settings → Pages → Source → GitHub Actions**. Di **Settings → Secrets and variables → Actions → Variables**, isi `STAGE0_APPS_SCRIPT_URL` dengan URL `/exec` dan `STAGE0_GOOGLE_CLIENT_ID` dengan Client ID. Jalankan workflow **Publish Stage 0 test page**. Workflow hanya memublikasikan panel dan konfigurasi klien. Client ID dan URL layanan memang dapat dilihat dari browser. [Workflow GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 5. Buka URL yang dilaporkan workflow. Login sebagai pemilik untuk memastikan POST dari `github.io` bisa membaca respons JSON setelah redirect Apps Script. Jika gagal, periksa **Network** di browser dan catat apakah masalahnya login, izin Sheets, atau pembacaan respons lintas origin. Jalankan skenario akun di matriks bawah dari GitHub Pages. Untuk tautan lama, gunakan URL Pages dengan `?project_id=<ID-A>`. Akun Google di luar undangan yang tokennya sah harus mendapat `FORBIDDEN`. Permintaan tanpa token harus mendapat `UNAUTHENTICATED`. [Redirect Content Service](https://developers.google.com/apps-script/guides/content#redirects).
 
-Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets yang disimulasikan. Endpoint Apps Script uji mengembalikan JSON `UNAUTHENTICATED` saat menerima POST tanpa token dengan header origin GitHub Pages.
-
-Pada 18 November 2026, [halaman uji GitHub Pages](https://syamsudintekno.github.io/LPJ-Litapdimas/) berhasil dibuka. Setelah login Google sebagai pemilik, browser menampilkan daftar dan detail proyek sintetis 2023 dan 2025 dengan peran `OWNER`. Uji hak tulis dan hak verifikasi pajak untuk proyek 2023 berhasil. Hasil ini memverifikasi bahwa browser GitHub Pages dapat membaca respons Apps Script untuk sesi pemilik. Uji kedua anggota, akun tanpa undangan, perubahan peran dan pencabutan, serta akses langsung ke Sheets dan Drive masih tertunda.
+Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets yang disimulasikan. Endpoint Apps Script uji mengembalikan JSON `UNAUTHENTICATED` tanpa data saat menerima POST tanpa token dengan header origin GitHub Pages. [Deployment GitHub Pages](https://github.com/syamsudintekno/LPJ-Litapdimas/actions/runs/44133150691) berhasil. Pengguna melaporkan login dan akses dasar pemilik serta kedua anggota berjalan sesuai peran dari browser GitHub Pages. Uji lintas proyek, verifikasi pajak oleh anggota, perubahan peran dalam sesi aktif, pencabutan, akun tanpa undangan, dan akses langsung ke berkas masih menunggu hasil.
 
 ## Menyiapkan uji wizard LPJ-01
 
@@ -52,6 +50,23 @@ Tambahkan `Budgets.gs` pada deployment sintetis yang sudah menyiapkan tab `proje
 
 Buka proyek draf atau aktif yang memiliki plafon resmi. Buat dan sahkan versi pertama, susun revisi dari versi itu, lalu sahkan revisinya. Pastikan versi sebelumnya berstatus **Digantikan** dan rincian lamanya masih dapat dibaca. Uji editor dapat membuat draf tetapi ditolak saat mengesahkan, serta pembaca hanya dapat membuka riwayat proyek yang ditugaskan.
 
+## Menyiapkan uji kegiatan LPJ-04
+
+Tambahkan `Activities.gs` bersama `Code.gs`, `Projects.gs`, `PeopleImport.gs`, dan `Budgets.gs` di deployment sintetis. Writer kegiatan memakai helper batch yang sudah ada di `Budgets.gs`. Siapkan `audit_log` dan `mutation_requests` seperti wizard, serta dua tab berikut. Aktifkan `ACTIVITIES_ENABLED=true` setelah skema siap.
+
+| Tab | Header |
+| --- | --- |
+| `activities` | `activity_id, project_id, activity_kind, title, activity_date, location, status, row_version, created_at, updated_at` |
+| `agenda_items` | `agenda_item_id, activity_id, start_time, end_time, title, speaker_person_id, row_version, created_at, updated_at` |
+
+Irisan ini baru menyediakan RPC, belum menu kegiatan. Gunakan adapter RPC dengan `activities.save`, ID proyek draf/aktif, UUID `request_id`, serta payload berikut. Server menghasilkan ID kegiatan dan sesi. Pembacaan memakai `activities.list` atau `activities.get` dengan `payload.activity_id` dalam proyek yang sama.
+
+```json
+{"activity":{"activity_kind":"FGD","title":"FGD sintetis","activity_date":"2026-11-18","location":"Ruang uji"},"agenda":[{"start_time":"09:00","end_time":"10:00","title":"Diskusi"}]}
+```
+
+Uji ulang UUID request yang sama: hasil dan jumlah baris harus tetap sama. Perubahan payload dengan UUID lama menghasilkan `CONFLICT`. Viewer dan anggota proyek lain ditolak saat membuat kegiatan. Tanggal tak sah, jam terbalik, sesi tumpang tindih, dan ID pembicara tak tersedia ditolak. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, logbook, penyuntingan, dan dokumen menyusul.
+
 ## Prototipe awal HTML Service
 
 Langkah deployment di bawah berlaku untuk reproduksi prototipe awal. Gunakan proyek Apps Script tersendiri, ubah `webapp.access` di manifest menjadi `DOMAIN` dan gunakan scope Sheets baca saja untuk skenario tersebut.
@@ -62,7 +77,7 @@ HTML Service memanggil `dispatch` melalui `google.script.run`. Setiap RPC memaka
 
 ## Uji lokal
 
-Jalankan `node --test stage0/access.test.cjs` dari akar repositori dengan Node.js 18 atau lebih baru. Pengujian menjalankan `Code.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment.
+Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 16 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, serta kegiatan/rundown; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
 
 ## Deployment uji dengan akun Google Workspace
 
@@ -78,9 +93,9 @@ Proyek A memakai ID `20000000-0000-4000-8000-000000000001` dan proyek B memakai 
 
 | Kasus | Langkah dan hasil yang diharapkan | Lokal | Google sungguhan |
 | --- | --- | --- | --- |
-| Pemilik | Baca kedua proyek. Kedua pemeriksaan hak berhasil pada masing-masing proyek. | Lulus | Belum dijalankan |
-| Anggota A | Daftar hanya memuat 2023. Baca A sebagai `EDITOR` dan jalankan uji hak tulis untuk A. Keduanya berhasil. | Lulus | Belum dijalankan |
-| Anggota B | Daftar hanya memuat 2025. Baca B sebagai `VIEWER`. Uji hak tulis untuk B menghasilkan `FORBIDDEN`. | Lulus | Belum dijalankan |
+| Pemilik | Daftar memuat 2023 dan 2025. Buka proyek dan periksa peran `OWNER`. | Lulus | Lulus menurut laporan pengguna |
+| Anggota A | Daftar hanya memuat 2023. Baca A sebagai `EDITOR` dan jalankan uji hak tulis untuk A. Keduanya berhasil. | Lulus | Lulus menurut laporan pengguna |
+| Anggota B | Daftar hanya memuat 2025. Baca B sebagai `VIEWER`. Uji hak tulis untuk B menghasilkan `FORBIDDEN`. | Lulus | Lulus menurut laporan pengguna |
 | Lintas proyek | Sebagai B, masukkan ID A dan tekan **Baca proyek**. Ulangi sebagai A dengan ID B. Server mengembalikan `FORBIDDEN`. | Lulus | Belum dijalankan |
 | Verifikasi pajak | Sebagai masing-masing anggota, tekan **Uji hak verifikasi pajak** untuk proyek yang ditugaskan. Server mengembalikan `FORBIDDEN`. | Lulus | Belum dijalankan |
 | Turun ke baca saja | Biarkan tab A terbuka. Sebagai pemilik, ubah `project_role` A menjadi `VIEWER` dan tunggu Sheets menyimpan perubahan. Pada tab yang sama, baca A dan ulangi uji hak tulis. Baca berhasil dan uji hak tulis menghasilkan `FORBIDDEN`. | Lulus | Belum dijalankan |

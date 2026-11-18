@@ -2,6 +2,13 @@
 
 Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHITECTURE.md), dan [panduan UI](DESIGN.md).
 
+## Progres 18 November 2026
+
+- Tahap 0: login dan akses dasar tiga akun dilaporkan berhasil. Uji penolakan akses Google sungguhan dan izin langsung berkas masih tertunda; tahap belum ditutup.
+- Tahap 1 (LPJ-01–03, LPJ-09): wizard/aktivasi, pencarian dan impor personel, serta draf/pengesahan/riwayat RAB sudah diimplementasikan. Pengujian lokal memakai layanan Google yang disimulasikan; alur tulis pada deployment sintetis dan penautan transaksi ke RAB belum diverifikasi.
+- Tahap 2 (LPJ-04, LPJ-09): RPC daftar/detail/pembuatan kegiatan dan rundown tersedia, disertai pemeriksaan akses proyek, validasi sesi, audit, batch atomik, serta idempotensi. UI, penyuntingan, peserta, distribusi, logbook, dan keluaran dokumen belum tersedia.
+- Pemeriksaan otomatis: `pnpm test` dan `pnpm build`; workflow CI menjalankannya pada push dan pull request. [Pelacak progres GitHub](https://github.com/syamsudintekno/LPJ-Litapdimas/issues/1).
+
 | Urutan | Hasil | Pemeriksaan sebelum dinyatakan selesai |
 | --- | --- | --- |
 | 0. Uji akses dari GitHub Pages | Bukti bahwa akun Google yang diundang bisa masuk dari `github.io` dan akses proyek ditegakkan server | Matriks uji di bawah. Catat konfigurasi layanan, hasil, dan keputusan transport di arsitektur. |
