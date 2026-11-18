@@ -7,7 +7,7 @@ function budgetTotal_(categories) {
   const codes = new Set();
   const details = [];
   let count = 0;
-  let total = 0n;
+  let total = 0;
   for (const category of categories) {
     if (!category || !budgetText_(category.category_code, 40) || !budgetText_(category.label, 120) ||
         !Array.isArray(category.items) || !category.items.length) return null;
@@ -22,14 +22,17 @@ function budgetTotal_(categories) {
           typeof item.volume !== 'number' || item.volume <= 0) return null;
       const scaledVolume = Math.round(item.volume * 1000);
       if (!Number.isSafeInteger(scaledVolume) || scaledVolume / 1000 !== item.volume) return null;
-      const amount = (BigInt(scaledVolume) * BigInt(item.frequency) * BigInt(item.unit_price_amount) + 500n) / 1000n;
+      const scaledAmount = scaledVolume * item.frequency * item.unit_price_amount;
+      if (!Number.isSafeInteger(scaledAmount)) return null;
+      const remainder = scaledAmount % 1000;
+      const amount = (scaledAmount - remainder) / 1000 + (remainder >= 500 ? 1 : 0);
       total += amount;
-      if (total > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-      items.push({...item, line_amount: Number(amount)});
+      if (!Number.isSafeInteger(total)) return null;
+      items.push({...item, line_amount: amount});
     }
     details.push({...category, items});
   }
-  return {categories: details, detail_total_amount: Number(total)};
+  return {categories: details, detail_total_amount: total};
 }
 
 function budgetText_(value, max) {
