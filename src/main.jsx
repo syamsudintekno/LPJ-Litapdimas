@@ -7,6 +7,7 @@ import {ProjectWizard} from './features/projects/ProjectWizard.jsx';
 import {ProjectActivation} from './features/projects/ProjectActivation.jsx';
 import {BudgetWorkspace} from './features/budgets/BudgetWorkspace.jsx';
 import {ActivityWorkspace} from './features/activities/ActivityWorkspace.jsx';
+import {LogbookWorkspace} from './features/logbook/LogbookWorkspace.jsx';
 import litapdimasLogo from './assets/login/litapdimas.png';
 import syekhWasilLogo from './assets/login/syekh-wasil.png';
 import './styles/tokens.css';
@@ -250,6 +251,8 @@ function Workspace({endpoint, token, expire, onSignOut}) {
           endpoint={endpoint} token={token} expire={expire} projectId={detail.data.project.project_id} role={detail.data.access_role} />}
         {detail.data.activities_enabled && <ActivityWorkspace key={detail.data.project.project_id}
           endpoint={endpoint} token={token} expire={expire} project={detail.data.project} people={detail.data.personnel} />}
+        {detail.data.logbook_enabled && <LogbookWorkspace key={detail.data.project.project_id}
+          endpoint={endpoint} token={token} expire={expire} project={detail.data.project} />}
       </div>}
     </section>
     {canManagePeople && <PeopleDirectory endpoint={endpoint} token={token} expire={expire}

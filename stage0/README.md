@@ -69,7 +69,21 @@ Untuk menguji RPC langsung, gunakan `activities.save`, ID proyek draf/aktif, UUI
 
 Uji ulang UUID request yang sama: hasil dan jumlah baris harus tetap sama. Perubahan payload dengan UUID lama menghasilkan `CONFLICT`. Viewer dan anggota proyek lain ditolak saat membuat kegiatan. Tanggal tak sah, jam terbalik, sesi tumpang tindih, dan ID pembicara tak tersedia ditolak. Bila hasil simpan belum diketahui di UI, isian dikunci dan **Coba simpan kembali** memakai request yang sama.
 
-Pengujian lokal browser dengan login/RPC sintetis lulus untuk gagal muat dan muat ulang, pembuatan oleh editor, validasi waktu dan fokus, retry setelah respons terputus, pembacaan rundown, pencarian, pembatasan UI viewer, serta lebar 360 px tanpa gulir horizontal halaman. Tampilan desktop dan mobile juga diperiksa melalui screenshot. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, logbook, penyuntingan, dan dokumen menyusul.
+Pengujian lokal browser dengan login/RPC sintetis lulus untuk gagal muat dan muat ulang, pembuatan oleh editor, validasi waktu dan fokus, retry setelah respons terputus, pembacaan rundown, pencarian, pembatasan UI viewer, serta lebar 360 px tanpa gulir horizontal halaman. Tampilan desktop dan mobile juga diperiksa melalui screenshot. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, penyuntingan kegiatan, dan dokumen menyusul.
+
+## Menyiapkan uji logbook LPJ-04
+
+Tambahkan `Logbook.gs` bersama berkas server yang sudah ada, termasuk `Budgets.gs` sebagai penyedia helper batch atomik. Perbarui `Code.gs`, siapkan tab `activities` seperti di atas (boleh kosong), serta tab `audit_log` dan `mutation_requests`. Buat tab `logbook_entries` dengan header berikut:
+
+```text
+logbook_entry_id, project_id, activity_id, entry_date, description, result, row_version, created_at, updated_at
+```
+
+Set `LOGBOOK_ENABLED=true` pada deployment sintetis, perbarui versi web app, lalu publikasikan build Pages terbaru. Di detail proyek, buka **Logbook penelitian → Tambah logbook**. Isi tanggal, uraian dan hasil; pilih kegiatan atau biarkan tanpa kegiatan terkait. Simpan, sunting, lalu periksa isi terbaru. Untuk melihat kegiatan yang baru dibuat pada bagian lain, gunakan **Muat ulang logbook** sebelum memilih kegiatan. Viewer hanya mendapat daftar, pencarian dan halaman baca.
+
+Uji dua pengguna menyunting versi yang sama: penyimpanan kedua harus menghasilkan `CONFLICT` dan tidak menimpa perubahan pertama. Isian tetap tersedia untuk disalin. Batalkan penyuntingan, muat ulang logbook, lalu buka kembali entri untuk memakai versi terbaru. Retry setelah koneksi terputus harus memakai payload dan UUID yang sama serta tidak menambah baris atau audit kedua. Server menolak kegiatan/entri dari proyek lain, akun tanpa hak tulis, tanggal tidak valid, serta penulisan baru pada proyek arsip. Pembacaan arsip dan pengulangan request yang sudah selesai tetap tunduk pada hak akses saat ini.
+
+Pengujian browser dengan login/RPC sintetis juga lulus untuk tambah dan sunting logbook, hubungan kegiatan opsional, retry setelah respons terputus, konflik versi tanpa kehilangan isian, pemuatan versi terbaru, pencarian, UI viewer, dan tata letak 360 px. Uji deployment Google sungguhan masih tertunda.
 
 ## Prototipe awal HTML Service
 
@@ -81,7 +95,7 @@ HTML Service memanggil `dispatch` melalui `google.script.run`. Setiap RPC memaka
 
 ## Uji lokal
 
-Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 16 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, serta kegiatan/rundown; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
+Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 18 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, kegiatan/rundown, serta logbook; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
 
 ## Deployment uji dengan akun Google Workspace
 

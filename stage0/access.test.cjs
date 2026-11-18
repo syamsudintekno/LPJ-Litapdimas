@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -110,6 +110,105 @@ function setup() {
   }
   return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes};
 }
+
+function setupLogbook() {
+  const env = setup();
+  const {sheets, projectA, projectB} = env;
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.projects[0].push('status');
+  sheets.projects.slice(1).forEach(row => row.push('ACTIVE'));
+  const activityA = randomUUID();
+  const activityB = randomUUID();
+  sheets.activities = [['activity_id', 'project_id', 'title', 'activity_date'],
+    [activityA, projectA, 'FGD Sintetis A', '2026-11-18'],
+    [activityB, projectB, 'FGD Sintetis B', '2026-11-19']];
+  sheets.logbook_entries = [['logbook_entry_id', 'project_id', 'activity_id', 'entry_date', 'description', 'result', ...stamp]];
+  sheets.audit_log = [['audit_id', 'request_id', 'user_id', 'project_id', 'action', 'entity_type', 'entity_id', 'occurred_at', 'change_summary']];
+  sheets.mutation_requests = [['request_id', 'user_id', 'action', 'payload_digest', 'result_ref', 'status', ...stamp]];
+  return {...env, activityA, activityB};
+}
+
+test('logbook membuat dan menyunting entri dengan versi, audit, batch atomik, dan retry idempoten', () => {
+  const {rpc, owner, editor, projectA, activityA, sheets, properties, writes} = setupLogbook();
+  const data = {entry_date: '2026-11-18', description: '=Diskusi rancangan', result: 'Rancangan diperbaiki', activity_id: activityA};
+  const createId = randomUUID();
+  const save = (payload, request_id = randomUUID()) => rpc(editor, 'logbook.save', projectA, {payload, request_id});
+  const list = () => rpc(editor, 'logbook.list', projectA);
+  assert.equal(list().error.code, 'TEMPORARY_FAILURE');
+  properties.LOGBOOK_ENABLED = 'true';
+  assert.equal(rpc(owner, 'projects.get', projectA).data.logbook_enabled, true);
+  assert.deepEqual(list().data.entries, []);
+  assert.equal(list().data.can_write, true);
+  writes.fail = true;
+  assert.equal(save(data, createId).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.logbook_entries.length, 1);
+  assert.equal(sheets.audit_log.length, 1);
+  assert.equal(sheets.mutation_requests.length, 1);
+  assert.equal(writes.locked, false);
+  writes.fail = false;
+  const created = save(data, createId).data;
+  assert.equal(created.row_version, 1);
+  assert.deepEqual(save(data, createId).data, created);
+  assert.equal(save({...data, result: 'Diubah'}, createId).error.code, 'CONFLICT');
+  const entry = list().data.entries[0];
+  assert.equal(entry.description, data.description);
+  assert.equal(entry.activity_title, 'FGD Sintetis A');
+  const createdColumn = sheets.logbook_entries[0].indexOf('created_at');
+  const createdAt = sheets.logbook_entries[1][createdColumn];
+  const editedData = {...data, logbook_entry_id: created.logbook_entry_id, expected_row_version: 1,
+    activity_id: '', result: 'Hasil setelah koreksi'};
+  const editId = randomUUID();
+  writes.fail = true;
+  assert.equal(save(editedData, editId).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(list().data.entries[0].result, data.result);
+  writes.fail = false;
+  const edited = save(editedData, editId).data;
+  assert.equal(edited.row_version, 2);
+  assert.deepEqual(save(editedData, editId).data, edited);
+  assert.equal(save(editedData).error.code, 'CONFLICT');
+  assert.deepEqual(save(data, createId).data, created);
+  assert.equal(sheets.logbook_entries[1][createdColumn], createdAt);
+  assert.equal(sheets.logbook_entries.length, 2);
+  assert.equal(sheets.audit_log.length, 3);
+  assert.equal(sheets.mutation_requests.length, 3);
+  const audit = JSON.parse(sheets.audit_log[2][8]);
+  assert.equal(audit.before.result, data.result);
+  assert.equal(audit.after.result, editedData.result);
+  assert.equal(list().data.entries[0].activity_title, '');
+  assert.equal(writes.batches, 2);
+  sheets.projects[1][4] = 'ARCHIVED';
+  assert.equal(list().data.can_write, false);
+  assert.equal(save(data).error.code, 'VALIDATION_ERROR');
+  assert.deepEqual(save(editedData, editId).data, edited);
+});
+
+test('logbook menolak akses, kegiatan/entri lintas proyek, tanggal salah, serta versi kosong', () => {
+  const {rpc, owner, editor, viewer, projectA, projectB, activityA, activityB, sheets, properties, writes} = setupLogbook();
+  properties.LOGBOOK_ENABLED = 'true';
+  const payload = {entry_date: '2026-11-18', description: 'Kajian literatur', result: 'Daftar rujukan'};
+  const save = (data = payload, account = editor, project = projectA) => rpc(account, 'logbook.save', project, {payload: data});
+  assert.equal(save(payload, editor, projectB).error.code, 'FORBIDDEN');
+  assert.equal(save(payload, viewer, projectB).error.code, 'FORBIDDEN');
+  assert.equal(rpc(viewer, 'logbook.list', projectA).error.code, 'FORBIDDEN');
+  assert.equal(rpc(viewer, 'logbook.list', projectB).data.can_write, false);
+  for (const invalid of [
+    {...payload, entry_date: '2026-02-30'}, {...payload, description: ' '}, {...payload, result: 'x'.repeat(4001)},
+    {...payload, logbook_entry_id: randomUUID()}, {...payload, activity_id: null},
+  ]) assert.equal(save(invalid).error.code, 'VALIDATION_ERROR');
+  assert.equal(save({...payload, activity_id: activityB}).error.code, 'NOT_FOUND');
+  const foreign = save(payload, owner, projectB).data;
+  assert.equal(save({...payload, logbook_entry_id: foreign.logbook_entry_id, expected_row_version: 1}).error.code, 'NOT_FOUND');
+  assert.equal(rpc(editor, 'logbook.list', projectA).data.entries.length, 0);
+  assert.deepEqual(rpc(editor, 'logbook.list', projectA).data.activities.map(row => row.activity_id), [activityA]);
+  writes.locked = true;
+  assert.equal(save().error.code, 'TEMPORARY_FAILURE');
+  writes.locked = false;
+  assert.equal(save().data.row_version, 1);
+  assert.equal(rpc(editor, 'logbook.list', projectA).data.entries[0].activity_id, '');
+  sheets.project_members[1][4] = '2026-11-18T00:00:00Z';
+  assert.equal(rpc(editor, 'logbook.list', projectA).error.code, 'FORBIDDEN');
+  assert.equal(save().error.code, 'FORBIDDEN');
+});
 
 test('kegiatan dan rundown terikat proyek, disimpan atomik, serta tidak terduplikasi saat retry', () => {
   const {rpc, owner, editor, viewer, projectA, projectB, sheets, properties, writes} = setup();

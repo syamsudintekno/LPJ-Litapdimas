@@ -1,0 +1,17 @@
+.workspace { display: grid; min-width: 0; gap: 16px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-border); }
+.workspace h3 { display: flex; align-items: center; gap: 8px; }
+.workspace h3, .workspace h4 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.context { color: var(--color-muted); font-size: 14px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.actions button { display: inline-flex; align-items: center; gap: 8px; }
+.actions span { font-size: 14px; }
+.field { display: grid; min-width: 0; gap: 4px; font-size: 14px; font-weight: 600; }
+.field input, .field select, .field textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 16px; font-weight: 400; }
+.field textarea { resize: vertical; }
+.entries { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.entries li, .form { display: grid; min-width: 0; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.entries dt { font-size: 14px; font-weight: 600; margin-top: 8px; }
+.entries dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+.form fieldset { display: grid; min-width: 0; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.form legend { font-weight: 600; padding-inline: 4px; }
+.error { color: var(--color-danger); }
