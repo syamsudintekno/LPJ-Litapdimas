@@ -6,6 +6,7 @@ import {PeopleDirectory} from './features/people/PeopleDirectory.jsx';
 import {ProjectWizard} from './features/projects/ProjectWizard.jsx';
 import {ProjectActivation} from './features/projects/ProjectActivation.jsx';
 import {BudgetWorkspace} from './features/budgets/BudgetWorkspace.jsx';
+import {ActivityWorkspace} from './features/activities/ActivityWorkspace.jsx';
 import litapdimasLogo from './assets/login/litapdimas.png';
 import syekhWasilLogo from './assets/login/syekh-wasil.png';
 import './styles/tokens.css';
@@ -247,6 +248,8 @@ function Workspace({endpoint, token, expire, onSignOut}) {
         </ul> : <p>Belum ada personel untuk proyek ini.</p>}
         {detail.data.budgets_enabled && <BudgetWorkspace key={detail.data.project.project_id}
           endpoint={endpoint} token={token} expire={expire} projectId={detail.data.project.project_id} role={detail.data.access_role} />}
+        {detail.data.activities_enabled && <ActivityWorkspace key={detail.data.project.project_id}
+          endpoint={endpoint} token={token} expire={expire} project={detail.data.project} people={detail.data.personnel} />}
       </div>}
     </section>
     {canManagePeople && <PeopleDirectory endpoint={endpoint} token={token} expire={expire}

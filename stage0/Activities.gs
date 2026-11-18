@@ -24,7 +24,7 @@ function activityInput_(payload) {
   };
 }
 
-function activityRpc_(spreadsheetId, user, request) {
+function activityRpc_(spreadsheetId, user, request, role) {
   const {action, project_id, request_id, payload} = request;
   const fail = (code, message) => failure_(request_id, code, message);
   const ok = data => ({ok: true, request_id, data});
@@ -49,12 +49,15 @@ function activityRpc_(spreadsheetId, user, request) {
       const activities = rows_(spreadsheetId, 'activities', ACTIVITY_FIELDS_)
         .filter(row => row.project_id === project_id)
         .sort((a, b) => a.activity_date.localeCompare(b.activity_date) || a.activity_id.localeCompare(b.activity_id));
-      if (!get) return ok({activities});
+      if (!get) return ok({activities, can_write: ['OWNER', 'EDITOR'].includes(role) && ['DRAFT', 'ACTIVE'].includes(project.status)});
       const activity = activities.find(row => row.activity_id === payload.activity_id);
       if (!activity) return fail('NOT_FOUND', 'Kegiatan tidak ditemukan dalam proyek ini.');
       const agenda = rows_(spreadsheetId, 'agenda_items', AGENDA_FIELDS_)
         .filter(row => row.activity_id === activity.activity_id).sort((a, b) => a.start_time.localeCompare(b.start_time));
-      return ok({activity, agenda});
+      const people = agenda.some(item => item.speaker_person_id) ? rows_(spreadsheetId, 'people', ['person_id', 'display_name']) : [];
+      return ok({activity, agenda: agenda.map(item => ({...item,
+        speaker_display_name: people.find(person => person.person_id === item.speaker_person_id)?.display_name || '',
+      }))});
     }
     const digest = requestDigest_([action, project_id, payload]);
     const previous = rows_(spreadsheetId, 'mutation_requests', ['request_id', 'user_id', 'action', 'payload_digest', 'result_ref', 'status'])

@@ -137,6 +137,10 @@ test('kegiatan dan rundown terikat proyek, disimpan atomik, serta tidak terdupli
   assert.equal(save(payload, editor, projectB).error.code, 'FORBIDDEN');
   assert.equal(list(viewer, projectA).error.code, 'FORBIDDEN');
   assert.deepEqual(list().data.activities, []);
+  assert.equal(list().data.can_write, true);
+  assert.equal(list(viewer, projectB).data.can_write, false);
+  assert.equal(rpc(editor, 'projects.get', projectA).data.activities_enabled, true);
+  assert.equal(rpc(editor, 'projects.get', projectA).data.personnel[0].person_id, sheets.people[1][0]);
   for (const data of [
     {...payload, activity: {...payload.activity, activity_date: '2026-02-30'}},
     {...payload, activity: {...payload.activity, title: ' '}},
@@ -167,10 +171,12 @@ test('kegiatan dan rundown terikat proyek, disimpan atomik, serta tidak terdupli
   const get = (account, project) => rpc(account, 'activities.get', project, {payload: {activity_id: created.activity_id}});
   const detail = get(editor, projectA).data;
   assert.equal(detail.agenda.length, 2);
+  assert.equal(detail.agenda[0].speaker_display_name, sheets.people[1][2]);
   assert.ok(detail.agenda.every(item => item.activity_id === created.activity_id));
   assert.equal(detail.agenda[1].speaker_person_id, '');
   assert.equal(get(viewer, projectB).error.code, 'NOT_FOUND');
   sheets.projects[1][4] = 'ARCHIVED';
+  assert.equal(list().data.can_write, false);
   assert.equal(save(payload, editor, projectA, randomUUID()).error.code, 'VALIDATION_ERROR');
   assert.deepEqual(save().data, created);
   assert.equal(get(editor, projectA).ok, true);

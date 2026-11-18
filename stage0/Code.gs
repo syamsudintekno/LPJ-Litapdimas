@@ -154,7 +154,7 @@ function dispatch_(request, identify) {
       if (!role || (request.action === 'activities.save' && role === 'VIEWER')) {
         return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan kegiatan ini.');
       }
-      return activityRpc_(spreadsheetId, user, request);
+      return activityRpc_(spreadsheetId, user, request, role);
     }
 
     if (request.action.startsWith('budgets.')) {
@@ -200,11 +200,13 @@ function dispatch_(request, identify) {
     const people = read('people', ['person_id', 'display_name']);
     const assignments = read('project_people', ['project_id', 'person_id', 'assignment_role']);
     const personnel = assignments.filter(row => row.project_id === project.project_id).map(row => ({
+      person_id: row.person_id,
       assignment_role: row.assignment_role,
       display_name: people.find(person => person.person_id === row.person_id)?.display_name ?? '',
     }));
     return success({project, access_role: roleFor(project.project_id), personnel,
-      budgets_enabled: PropertiesService.getScriptProperties().getProperty('BUDGETS_ENABLED') === 'true'});
+      budgets_enabled: PropertiesService.getScriptProperties().getProperty('BUDGETS_ENABLED') === 'true',
+      activities_enabled: PropertiesService.getScriptProperties().getProperty('ACTIVITIES_ENABLED') === 'true'});
   } catch (error) {
     return failure('TEMPORARY_FAILURE', 'Data uji tidak dapat dibaca. Periksa konfigurasi.');
   }

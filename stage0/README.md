@@ -59,13 +59,17 @@ Tambahkan `Activities.gs` bersama `Code.gs`, `Projects.gs`, `PeopleImport.gs`, d
 | `activities` | `activity_id, project_id, activity_kind, title, activity_date, location, status, row_version, created_at, updated_at` |
 | `agenda_items` | `agenda_item_id, activity_id, start_time, end_time, title, speaker_person_id, row_version, created_at, updated_at` |
 
-Irisan ini baru menyediakan RPC, belum menu kegiatan. Gunakan adapter RPC dengan `activities.save`, ID proyek draf/aktif, UUID `request_id`, serta payload berikut. Server menghasilkan ID kegiatan dan sesi. Pembacaan memakai `activities.list` atau `activities.get` dengan `payload.activity_id` dalam proyek yang sama.
+Setelah memperbarui `Code.gs` dan `Activities.gs` serta memublikasikan build frontend terbaru, buka detail proyek. Bagian **Kegiatan dan rundown** tampil jika deployment mengaktifkan fitur. Sebagai pemilik/editor, pilih **Tambah kegiatan**, isi judul, jenis, tanggal dan lokasi, lalu tambahkan sesi berurutan. Pembicara opsional dipilih dari personel proyek. Simpan draf dan periksa detail rundown. Viewer hanya mendapat daftar dan detail. Daftar mendukung pencarian serta delapan kegiatan per halaman.
+
+Untuk menguji RPC langsung, gunakan `activities.save`, ID proyek draf/aktif, UUID `request_id`, serta payload berikut. Server menghasilkan ID kegiatan dan sesi. Pembacaan memakai `activities.list` atau `activities.get` dengan `payload.activity_id` dalam proyek yang sama.
 
 ```json
 {"activity":{"activity_kind":"FGD","title":"FGD sintetis","activity_date":"2026-11-18","location":"Ruang uji"},"agenda":[{"start_time":"09:00","end_time":"10:00","title":"Diskusi"}]}
 ```
 
-Uji ulang UUID request yang sama: hasil dan jumlah baris harus tetap sama. Perubahan payload dengan UUID lama menghasilkan `CONFLICT`. Viewer dan anggota proyek lain ditolak saat membuat kegiatan. Tanggal tak sah, jam terbalik, sesi tumpang tindih, dan ID pembicara tak tersedia ditolak. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, logbook, penyuntingan, dan dokumen menyusul.
+Uji ulang UUID request yang sama: hasil dan jumlah baris harus tetap sama. Perubahan payload dengan UUID lama menghasilkan `CONFLICT`. Viewer dan anggota proyek lain ditolak saat membuat kegiatan. Tanggal tak sah, jam terbalik, sesi tumpang tindih, dan ID pembicara tak tersedia ditolak. Bila hasil simpan belum diketahui di UI, isian dikunci dan **Coba simpan kembali** memakai request yang sama.
+
+Pengujian lokal browser dengan login/RPC sintetis lulus untuk gagal muat dan muat ulang, pembuatan oleh editor, validasi waktu dan fokus, retry setelah respons terputus, pembacaan rundown, pencarian, pembatasan UI viewer, serta lebar 360 px tanpa gulir horizontal halaman. Tampilan desktop dan mobile juga diperiksa melalui screenshot. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, logbook, penyuntingan, dan dokumen menyusul.
 
 ## Prototipe awal HTML Service
 
