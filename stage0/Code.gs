@@ -96,7 +96,8 @@ function dispatch_(request, identify) {
       'people.search', 'people.preview_import', 'people.commit_import', 'budgets.list_versions',
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
-      'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview', 'stage0.write_probe', 'taxes.verify'];
+      'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
+      'transactions.list', 'transactions.save', 'stage0.write_probe', 'taxes.verify'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -146,6 +147,17 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action.startsWith('transactions.')) {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
+        return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      }
+      const role = roleFor(request.project_id);
+      if (!role || (request.action === 'transactions.save' && role === 'VIEWER')) {
+        return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan transaksi ini.');
+      }
+      return transactionRpc_(spreadsheetId, user, request, role);
+    }
 
     if (request.action === 'reports.preview') {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
@@ -238,7 +250,8 @@ function dispatch_(request, identify) {
     return success({project, access_role: roleFor(project.project_id), personnel,
       budgets_enabled: PropertiesService.getScriptProperties().getProperty('BUDGETS_ENABLED') === 'true',
       activities_enabled: PropertiesService.getScriptProperties().getProperty('ACTIVITIES_ENABLED') === 'true',
-      logbook_enabled: PropertiesService.getScriptProperties().getProperty('LOGBOOK_ENABLED') === 'true'});
+      logbook_enabled: PropertiesService.getScriptProperties().getProperty('LOGBOOK_ENABLED') === 'true',
+      transactions_enabled: PropertiesService.getScriptProperties().getProperty('TRANSACTIONS_ENABLED') === 'true'});
   } catch (error) {
     return failure('TEMPORARY_FAILURE', 'Data uji tidak dapat dibaca. Periksa konfigurasi.');
   }

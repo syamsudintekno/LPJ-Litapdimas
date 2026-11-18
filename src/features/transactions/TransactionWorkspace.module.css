@@ -1,0 +1,23 @@
+.workspace { display: grid; min-width: 0; gap: 16px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-border); }
+.workspace h3 { display: flex; align-items: center; gap: 8px; }
+.workspace h3, .workspace h4 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.context { color: var(--color-muted); font-size: 14px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.actions button, .form button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.actions span { font-size: 14px; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px; }
+.summary div { padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); }
+.summary dt { font-size: 14px; color: var(--color-muted); }
+.summary dd { font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.field { display: grid; min-width: 0; gap: 4px; font-size: 14px; font-weight: 600; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 12px; }
+.field input, .field select, .field textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 16px; font-weight: 400; }
+.field textarea { resize: vertical; }
+.transactions, .payments { display: grid; min-width: 0; gap: 12px; padding: 0; margin: 0; list-style: none; }
+.transactions > li, .form { display: grid; min-width: 0; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.payments li { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.payments span { font-size: 14px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.form fieldset { display: grid; min-width: 0; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.form legend { padding-inline: 4px; font-weight: 600; }
+.form fieldset > button { justify-self: start; }
+.error { color: var(--color-danger); }

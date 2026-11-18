@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -170,6 +170,140 @@ function setupActivityDocuments() {
   properties.ACTIVITIES_ENABLED = 'true';
   return env;
 }
+
+function setupTransactions() {
+  const env = setupParticipants();
+  const {sheets, projectA, projectB} = env;
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.projects[0].push('active_budget_version_id');
+  const versionA = randomUUID(); const versionB = randomUUID();
+  sheets.projects[1].push(versionA); sheets.projects[2].push(versionB);
+  const categoryA = randomUUID(); const categoryB = randomUUID();
+  const itemA = randomUUID(); const itemB = randomUUID();
+  sheets.budget_versions = [['budget_version_id', 'project_id', 'version_no', 'status', 'approved_by_user_id', 'approved_at', ...stamp],
+    [versionA, projectA, 1, 'APPROVED', '', '', 1], [versionB, projectB, 1, 'APPROVED', '', '', 1]];
+  sheets.budget_categories = [['budget_category_id', 'budget_version_id', 'category_code', 'label', 'sort_order', ...stamp],
+    [categoryA, versionA, 'A', 'Kegiatan A', 1, 1], [categoryB, versionB, 'B', 'Kegiatan B', 1, 1]];
+  sheets.budget_items = [['budget_item_id', 'budget_category_id', 'label', 'volume', 'frequency', 'unit', 'unit_price_amount', ...stamp],
+    [itemA, categoryA, 'Honor', 1, 1, 'paket', 900000, 1], [itemB, categoryB, 'Honor B', 1, 1, 'paket', 900000, 1]];
+  const payeeA = randomUUID(); const payeeB = randomUUID();
+  sheets.payees = [['payee_id', 'payee_kind', 'person_id', 'legal_name', 'tax_profile_ref', ...stamp],
+    [payeeA, 'PERSON', sheets.people[1][0], 'Penerima Sintetis A', 'private-profile-A', 1],
+    [payeeB, 'ORGANIZATION', '', 'Vendor Proyek B', 'private-profile-B', 1]];
+  sheets.transactions = [['transaction_id', 'project_id', 'budget_item_id', 'activity_id', 'payment_date', 'expense_kind', 'description', 'status', ...stamp]];
+  sheets.payment_details = [['payment_detail_id', 'transaction_id', 'payee_id', 'receipt_amount', 'withheld_tax_amount', 'added_tax_amount', 'net_paid_amount', ...stamp]];
+  sheets.tax_assessments = [['tax_assessment_id', 'payment_detail_id', 'status']];
+  sheets.receipts = [['receipt_id', 'payment_detail_id', 'status']];
+  const payload = {transaction: {budget_item_id: itemA, activity_id: env.activityA, payment_date: '2026-11-18', expense_kind: 'HONOR', description: '=Honor sintetis'},
+    payments: [{payee_id: payeeA, receipt_amount: 900000, withheld_tax_amount: 45000}]};
+  const save = (data = payload, id = randomUUID(), account = env.editor, project = projectA) =>
+    env.rpc(account, 'transactions.save', project, {request_id: id, payload: data});
+  const list = (account = env.editor, project = projectA) => env.rpc(account, 'transactions.list', project);
+  return {...env, payload, save, list, itemA, itemB, payeeA, payeeB, versionA};
+}
+
+test('transaksi menghitung netto di server, menjaga versi dan audit, serta mengulang hasil tanpa duplikasi', () => {
+  const {payload, save, list, sheets, properties, writes, rpc, owner, projectA} = setupTransactions();
+  assert.equal(list().error.code, 'TEMPORARY_FAILURE');
+  properties.TRANSACTIONS_ENABLED = 'true';
+  assert.equal(rpc(owner, 'projects.get', projectA).data.transactions_enabled, true);
+  assert.equal(list().data.confirmed_total_amount, 0);
+  const id = randomUUID();
+  const submitted = {...payload, transaction: {...payload.transaction, status: 'CONFIRMED'},
+    payments: [{...payload.payments[0], net_paid_amount: 1}]};
+  writes.fail = true;
+  assert.equal(save(submitted, id).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.transactions.length, 1);
+  assert.equal(sheets.payment_details.length, 1);
+  assert.equal(sheets.audit_log.length, 1);
+  writes.fail = false;
+  const created = save(submitted, id).data;
+  assert.equal(created.status, 'DRAFT');
+  assert.deepEqual(created.totals, {receipt_amount: 900000, withheld_tax_amount: 45000, added_tax_amount: 0, net_paid_amount: 855000});
+  assert.deepEqual(save(submitted, id).data, created);
+  assert.equal(save(payload, id).error.code, 'CONFLICT');
+  let row = list().data.transactions[0];
+  assert.equal(row.description, '=Honor sintetis');
+  assert.equal(row.payments[0].net_paid_amount, 855000);
+  assert.equal(list().data.draft_total_amount, 900000);
+  assert.equal(list().data.confirmed_total_amount, 0);
+  const createdAt = sheets.transactions[1][9];
+  const edit = {...payload, transaction_id: row.transaction_id, expected_row_version: row.row_version,
+    expected_payment_versions: {[row.payments[0].payment_detail_id]: row.payments[0].row_version},
+    payments: [{...payload.payments[0], payment_detail_id: row.payments[0].payment_detail_id, receipt_amount: 1000000}]};
+  const editId = randomUUID();
+  assert.equal(save(edit, editId).data.row_version, 2);
+  assert.equal(save(edit, editId).data.totals.net_paid_amount, 955000);
+  assert.equal(save(edit).error.code, 'CONFLICT');
+  assert.equal(sheets.transactions[1][9], createdAt);
+  assert.equal(sheets.transactions.length, 2);
+  assert.equal(sheets.payment_details.length, 2);
+  const audit = JSON.parse(sheets.audit_log[2][8]);
+  assert.equal(audit.before_payments[0].receipt_amount, 900000);
+  assert.equal(audit.after_payments[0].receipt_amount, 1000000);
+  row = list().data.transactions[0];
+  sheets.tax_assessments.push([randomUUID(), row.payments[0].payment_detail_id, 'PENDING']);
+  assert.equal(list().data.transactions[0].can_edit, false);
+  assert.equal(save({...edit, expected_row_version: 2}).error.code, 'CONFLICT');
+  assert.equal(writes.batches, 2);
+  assert.equal(writes.locked, false);
+});
+
+test('transaksi menolak rupiah tidak aman, referensi lintas proyek, penerima tanpa cakupan, dan versi pembayaran lama', () => {
+  const {save, list, payload, itemB, payeeB, viewer, owner, projectB, sheets, properties} = setupTransactions();
+  properties.TRANSACTIONS_ENABLED = 'true';
+  assert.equal(save(payload, randomUUID(), viewer, projectB).error.code, 'FORBIDDEN');
+  assert.equal(list(viewer).error.code, 'FORBIDDEN');
+  assert.equal(save({...payload, transaction: {...payload.transaction, budget_item_id: itemB}}).error.code, 'VALIDATION_ERROR');
+  assert.equal(save({...payload, transaction: {...payload.transaction, activity_id: randomUUID()}}).error.code, 'NOT_FOUND');
+  assert.equal(save({...payload, payments: [{...payload.payments[0], payee_id: payeeB}]}).error.code, 'FORBIDDEN');
+  assert.equal(list().data.payees.some(row => row.payee_id === payeeB), false);
+  assert.equal(JSON.stringify(list(owner).data).includes('private-profile'), false);
+  for (const payment of [{receipt_amount: 1.5}, {receipt_amount: Number.MAX_SAFE_INTEGER + 1}, {withheld_tax_amount: 900001},
+    {withheld_tax_amount: -1}, {added_tax_amount: 1}]) {
+    assert.equal(save({...payload, payments: [{...payload.payments[0], ...payment}]}).error.code, 'VALIDATION_ERROR');
+  }
+  assert.equal(save({...payload, payments: [payload.payments[0], payload.payments[0]]}).error.code, 'VALIDATION_ERROR');
+  assert.equal(save({...payload, payments: [
+    {...payload.payments[0], receipt_amount: Number.MAX_SAFE_INTEGER, withheld_tax_amount: 0},
+    {payee_id: payeeB, receipt_amount: 1, withheld_tax_amount: 0},
+  ]}, randomUUID(), owner).error.code, 'VALIDATION_ERROR');
+  const created = save().data;
+  const row = list().data.transactions[0];
+  const edit = {...payload, transaction_id: created.transaction_id, expected_row_version: 1,
+    expected_payment_versions: {[row.payments[0].payment_detail_id]: 99}, payments: [payload.payments[0]]};
+  assert.equal(save(edit).error.code, 'CONFLICT');
+  sheets.payment_details[1][6] = 1;
+  assert.equal(list().error.code, 'TEMPORARY_FAILURE');
+  sheets.payment_details[1][6] = 855000;
+  sheets.transactions[1][7] = 'CONFIRMED';
+  assert.equal(list().data.draft_total_amount, 0);
+  assert.equal(list().data.confirmed_total_amount, 900000);
+  assert.equal(list().data.transactions[0].can_edit, false);
+  sheets.projects[1][4] = 'ARCHIVED';
+  assert.equal(list().data.can_write, false);
+  assert.equal(save().error.code, 'VALIDATION_ERROR');
+});
+
+test('transaksi mempertahankan item versi RAB lama dan melarang draf baru memakainya setelah revisi', () => {
+  const {save, list, payload, versionA, projectA, sheets, properties} = setupTransactions();
+  properties.TRANSACTIONS_ENABLED = 'true';
+  const created = save().data;
+  const payment = list().data.transactions[0].payments[0];
+  sheets.budget_versions[1][3] = 'SUPERSEDED';
+  const nextVersion = randomUUID(); const nextCategory = randomUUID(); const nextItem = randomUUID();
+  sheets.budget_versions.push([nextVersion, projectA, 2, 'APPROVED', '', '', 1]);
+  sheets.budget_categories.push([nextCategory, nextVersion, 'A2', 'Kegiatan revisi', 1, 1]);
+  sheets.budget_items.push([nextItem, nextCategory, 'Honor revisi', 1, 1, 'paket', 900000, 1]);
+  sheets.projects[1][5] = nextVersion;
+  assert.equal(save(payload).error.code, 'VALIDATION_ERROR');
+  const edit = {...payload, transaction_id: created.transaction_id, expected_row_version: 1,
+    expected_payment_versions: {[payment.payment_detail_id]: payment.row_version}, payments: [{...payload.payments[0], payment_detail_id: payment.payment_detail_id}]};
+  assert.equal(save(edit).data.row_version, 2);
+  assert.equal(list().data.transactions[0].budget_version_no, 1);
+  assert.equal(list().data.budget_items.find(row => row.budget_item_id === payload.transaction.budget_item_id).is_current, false);
+  assert.equal(save({...payload, transaction: {...payload.transaction, budget_item_id: nextItem}}).data.status, 'DRAFT');
+});
 
 test('penyuntingan kegiatan menjaga ID, memeriksa versi seluruh rundown, dan mengganti sesi atomik', () => {
   const {rpc, editor, owner, viewer, projectA, projectB, activityA, activityB, sheets, writes} = setupActivityDocuments();

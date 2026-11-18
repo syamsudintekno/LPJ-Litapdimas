@@ -8,6 +8,7 @@ import {ProjectActivation} from './features/projects/ProjectActivation.jsx';
 import {BudgetWorkspace} from './features/budgets/BudgetWorkspace.jsx';
 import {ActivityWorkspace} from './features/activities/ActivityWorkspace.jsx';
 import {LogbookWorkspace} from './features/logbook/LogbookWorkspace.jsx';
+import {TransactionWorkspace} from './features/transactions/TransactionWorkspace.jsx';
 import litapdimasLogo from './assets/login/litapdimas.png';
 import syekhWasilLogo from './assets/login/syekh-wasil.png';
 import './styles/tokens.css';
@@ -252,6 +253,8 @@ function Workspace({endpoint, token, expire, onSignOut}) {
         {detail.data.activities_enabled && <ActivityWorkspace key={detail.data.project.project_id}
           endpoint={endpoint} token={token} expire={expire} project={detail.data.project} people={detail.data.personnel} />}
         {detail.data.logbook_enabled && <LogbookWorkspace key={detail.data.project.project_id}
+          endpoint={endpoint} token={token} expire={expire} project={detail.data.project} />}
+        {detail.data.transactions_enabled && <TransactionWorkspace key={detail.data.project.project_id}
           endpoint={endpoint} token={token} expire={expire} project={detail.data.project} />}
       </div>}
     </section>

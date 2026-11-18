@@ -113,6 +113,26 @@ Tambahkan `ActivityReports.gs`, siapkan seluruh tab kegiatan, agenda, logbook, p
 
 Pilih **Cetak draf** untuk dialog cetak browser dan penyimpanan PDF. Tabel A4 mengulang header pada halaman lanjutan; shell dan tombol aplikasi tidak ikut dicetak. Kolom tanda tangan dibiarkan kosong. Distribusi hanya memuat penerimaan positif dan total unit, bukan nominal rupiah. Draf ini belum menjadi snapshot/arsip final di Drive. Uji browser sintetis lulus untuk penyuntingan, konflik versi, penggantian sesi, retry, akses viewer, Escape/pemulihan fokus dialog, dan pratinjau mobile. PDF QA dengan 45 peserta serta 12 catatan logbook panjang menghasilkan 10 halaman A4; semua halaman dirender dan diperiksa. Keenam bagian, header tabel berulang, serta pengecualian shell/tombol dari cetak sudah diverifikasi tanpa halaman kosong. Pengujian Google sungguhan dan pencocokan dengan format resmi LPJ masih tertunda.
 
+## Menyiapkan uji draf transaksi LPJ-05
+
+Tambahkan `Transactions.gs` dan perbarui `Code.gs`. Gunakan proyek/spreadsheet sintetis dengan semua tab RAB, kegiatan, penugasan, peserta/distribusi, audit dan jurnal yang sudah ada. Buat tab berikut; tabel pajak/kwitansi boleh kosong, tetapi header tetap diperlukan untuk memeriksa hubungan yang mengunci penyuntingan.
+
+| Tab | Header |
+| --- | --- |
+| `payees` | `payee_id, payee_kind, person_id, legal_name, tax_profile_ref, row_version, created_at, updated_at` |
+| `transactions` | `transaction_id, project_id, budget_item_id, activity_id, payment_date, expense_kind, description, status, row_version, created_at, updated_at` |
+| `payment_details` | `payment_detail_id, transaction_id, payee_id, receipt_amount, withheld_tax_amount, added_tax_amount, net_paid_amount, row_version, created_at, updated_at` |
+| `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, row_version, created_at, updated_at` |
+| `receipts` | `receipt_id, payment_detail_id, project_id, receipt_no, issued_on, status, row_version, created_at, updated_at` |
+
+Isi payee sintetis dengan UUID stabil, jenis `PERSON`, `ORGANIZATION`, atau `GROUP`, dan nama. Payee `PERSON` dapat merujuk `person_id` dari Master Personel. Pemilik melihat pilihan payee valid; anggota hanya melihat personel/peserta proyek dan payee yang sudah dipakai pada proyeknya. Profil pajak tidak ditampilkan ke browser. Pengelolaan payee melalui UI menyusul.
+
+Sahkan satu RAB agar menjadi versi aktif. Set `TRANSACTIONS_ENABLED=true`, perbarui web app dan build Pages, lalu buka detail proyek → **Transaksi proyek → Tambah transaksi**. Pilih item RAB dan kegiatan bila ada, isi tanggal/tujuan/jenis belanja, lalu pilih 1–30 penerima berbeda. Input nilai kwitansi dan usulan potongan dalam rupiah utuh. Simpan dan periksa contoh Rp900.000, potongan Rp45.000, netto Rp855.000. Server menghitung netto; nilai draf belum masuk total terkonfirmasi.
+
+Uji retry setelah respons terputus: UUID/payload tetap sama dan tidak menambah transaksi atau pembayaran. Uji penyuntingan dua versi bersaing: versi lama ditolak tanpa menimpa perubahan terbaru. Rincian pembayaran juga diperiksa versinya; data yang sudah tertaut penilaian pajak, kwitansi atau distribusi tidak boleh disunting lewat alur ini. Setelah revisi RAB disahkan, draf lama tetap menunjuk item/versi sebelumnya; draf baru harus memilih versi aktif. Viewer hanya membaca dan ID lintas proyek ditolak.
+
+Potongan pada draf ini masih usulan. Pajak tambahan nonzero ditolak; tarif otomatis, unggah/penautan bukti, verifikasi pajak, konfirmasi realisasi, penerbitan kwitansi, setoran dan rekap tahap menyusul. Pengujian browser dengan login/RPC sintetis lulus untuk tambah/sunting draf, retry dengan UUID/payload yang sama, pemulihan konflik versi induk/pembayaran, penambahan/penghapusan penerima, pencarian, akses viewer, dan tampilan 360 px tanpa gulir horizontal. Tampilan desktop/mobile diperiksa melalui screenshot. Belum ada pembaruan atau pengujian deployment Google untuk fitur ini.
+
 ## Prototipe awal HTML Service
 
 Langkah deployment di bawah berlaku untuk reproduksi prototipe awal. Gunakan proyek Apps Script tersendiri, ubah `webapp.access` di manifest menjadi `DOMAIN` dan gunakan scope Sheets baca saja untuk skenario tersebut.
@@ -123,7 +143,7 @@ HTML Service memanggil `dispatch` melalui `google.script.run`. Setiap RPC memaka
 
 ## Uji lokal
 
-Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 23 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, kegiatan/rundown, logbook, peserta/distribusi, pembacaan CSV peserta, penyuntingan kegiatan, serta paket pratinjau; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
+Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 26 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, kegiatan/rundown, logbook, peserta/distribusi, pembacaan CSV peserta, penyuntingan kegiatan, paket pratinjau, serta draf transaksi; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
 
 ## Deployment uji dengan akun Google Workspace
 
