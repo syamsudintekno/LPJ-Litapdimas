@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowRight, CalendarRange, ChevronLeft, ClipboardList, FolderOpen, LogOut, RefreshCw, Search, Users} from 'lucide-react';
+import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, RefreshCw, Search, Users} from 'lucide-react';
 import {callProjectRpc, loadConfig, loadGoogleSignIn} from './rpc.js';
 import './styles/tokens.css';
 import './styles/globals.css';
@@ -12,6 +12,48 @@ function Brand() {
   return <div className={styles.brand}>
     <span className={styles.brandIcon}><ClipboardList size={20} aria-hidden="true" /></span>
     LPJ Litapdimas
+  </div>;
+}
+
+function AppShell({children, onSignOut}) {
+  const [sidebarOpen, setSidebarOpen] = useState(() => matchMedia('(min-width: 861px)').matches);
+  const [section, setSection] = useState(() => location.hash === '#daftar-proyek' ? 'daftar-proyek' : 'ringkasan');
+
+  function navigate(target) {
+    setSection(target);
+    document.getElementById(target)?.focus({preventScroll: true});
+    if (!matchMedia('(min-width: 861px)').matches) setSidebarOpen(false);
+  }
+
+  return <div className={styles.shell} data-sidebar-open={sidebarOpen}>
+    <aside id="workspace-sidebar" className={styles.sidebar} hidden={!sidebarOpen}>
+      <Brand />
+      <nav className={styles.navigation} aria-label="Ruang kerja">
+        <a href="#ringkasan" aria-current={section === 'ringkasan' ? 'location' : undefined} onClick={() => navigate('ringkasan')}>
+          <LayoutDashboard size={18} aria-hidden="true" /> Ringkasan
+        </a>
+        <a href="#daftar-proyek" aria-current={section === 'daftar-proyek' ? 'location' : undefined} onClick={() => navigate('daftar-proyek')}>
+          <FolderOpen size={18} aria-hidden="true" /> Daftar proyek
+        </a>
+      </nav>
+    </aside>
+    <div className={styles.shellBody}>
+      <header className={styles.appHeader}>
+        <div className={styles.appContext}>
+          <button className={styles.secondary} type="button" aria-label={sidebarOpen ? 'Tutup navigasi' : 'Buka navigasi'}
+            aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={() => setSidebarOpen(open => !open)}>
+            <Menu size={18} aria-hidden="true" />
+          </button>
+          <span>Ruang kerja</span>
+          <ChevronRight size={14} aria-hidden="true" />
+          <strong>Proyek</strong>
+        </div>
+        <button className={styles.secondary} type="button" onClick={onSignOut}>
+          <LogOut size={16} aria-hidden="true" /> Keluar
+        </button>
+      </header>
+      {children}
+    </div>
   </div>;
 }
 
@@ -68,18 +110,37 @@ function Workspace({endpoint, token, expire}) {
     setDetailRevision(value => value + 1);
   }
 
-  return <main className={styles.workspace}>
+  return <main id="ringkasan" tabIndex={-1} className={styles.workspace}>
     <div className={styles.heading}>
       <div>
         <h1>Proyek penelitian</h1>
-        <p>Pilih proyek untuk melihat tim dan personel LPJ.</p>
+        <p>Telusuri proyek dan lihat personel LPJ per tahun anggaran.</p>
       </div>
       <button className={styles.secondary} type="button" onClick={updateProjects} disabled={!list}>
         <RefreshCw size={16} aria-hidden="true" /> Muat ulang
       </button>
     </div>
 
-    <section className={styles.panel} aria-label="Daftar proyek" aria-busy={!list}>
+    {list?.data && <dl className={styles.summary} aria-label="Ringkasan proyek">
+      <div className={styles.summaryProjects}>
+        <dt>Proyek yang dapat diakses</dt>
+        <dd>{projects.length}</dd>
+        <FolderOpen size={30} aria-hidden="true" />
+      </div>
+      <div className={styles.summaryYears}>
+        <dt>Tahun anggaran terdaftar</dt>
+        <dd>{years.length}</dd>
+        <CalendarRange size={30} aria-hidden="true" />
+      </div>
+      <div className={styles.summaryLatest}>
+        <dt>Tahun anggaran terbaru</dt>
+        <dd>{years[0] ?? '—'}</dd>
+        <ClipboardList size={30} aria-hidden="true" />
+      </div>
+    </dl>}
+
+    <section id="daftar-proyek" tabIndex={-1} className={styles.panel} aria-labelledby="list-heading" aria-busy={!list}>
+      <div className={styles.panelHeading}><h2 id="list-heading">Daftar proyek</h2></div>
       <div className={styles.toolbar}>
         <label>
           Cari proyek
@@ -166,9 +227,11 @@ function SignIn({message, error, ready}) {
 
   return <main className={styles.welcome}>
     <div className={styles.welcomeCopy}>
-      <div className={styles.welcomeIcon}><FolderOpen size={28} aria-hidden="true" /></div>
-      <h1>Pertanggungjawaban penelitian</h1>
-      <p>Akses proyek penelitian dan personel LPJ dalam satu tempat.</p>
+      <Brand />
+      <div>
+        <h1>Pertanggungjawaban penelitian</h1>
+        <p>Ruang kerja bagi pemilik dan anggota peneliti untuk mengakses proyek dan personel LPJ.</p>
+      </div>
     </div>
     <section className={styles.signIn} aria-labelledby="sign-in-heading">
       <h2 id="sign-in-heading">Masuk ke ruang kerja</h2>
@@ -217,16 +280,9 @@ function App() {
     window.google?.accounts.id.disableAutoSelect();
   }
 
-  return <>
-    <header className={styles.header}>
-      <div className={styles.headerInner}>
-        <Brand />
-        {token && <button className={styles.secondary} type="button" onClick={signOut}><LogOut size={16} aria-hidden="true" /> Keluar</button>}
-      </div>
-    </header>
-    {token ? <Workspace endpoint={endpoint} token={token} expire={expire} /> :
-      <SignIn ready={ready} error={error} message={message || (!ready ? 'Menyiapkan login…' : '')} />}
-  </>;
+  return token ? <AppShell onSignOut={signOut}>
+    <Workspace endpoint={endpoint} token={token} expire={expire} />
+  </AppShell> : <SignIn ready={ready} error={error} message={message || (!ready ? 'Menyiapkan login…' : '')} />;
 }
 
 createRoot(document.getElementById('root')).render(<App />);

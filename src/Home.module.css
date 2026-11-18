@@ -1,22 +1,51 @@
-.header {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
 }
-.headerInner, .workspace, .welcome {
-  max-width: 72rem;
-  margin-inline: auto;
-  padding-inline: 24px;
+.shell[data-sidebar-open="true"] { grid-template-columns: 236px minmax(0, 1fr); }
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background: #112d35;
+  color: #fff;
 }
-.headerInner, .heading, .detailHeader {
+.sidebar .brand { padding-inline: 8px; }
+.navigation { display: grid; gap: 4px; margin-top: 32px; }
+.navigation a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  color: #cedee1;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.navigation a:hover, .navigation a[aria-current] { background: #234b50; color: #fff; }
+.navigation a:focus-visible { outline-color: #9febdf; }
+.shellBody { min-width: 0; }
+.appHeader, .heading, .detailHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
-.headerInner { min-height: 72px; }
+.appHeader {
+  min-height: 64px;
+  padding: 8px 32px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.appContext { display: flex; align-items: center; gap: 12px; color: var(--color-muted); font-size: 14px; }
+.appContext strong { color: var(--color-text); }
 .brand, .secondary { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .brand { gap: 12px; }
-.brandIcon, .welcomeIcon, .folder {
+.brandIcon, .folder {
   display: grid;
   flex: none;
   place-items: center;
@@ -39,15 +68,42 @@
 }
 .secondary:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
 
-.workspace { display: grid; gap: 24px; padding-block: 48px; }
+.workspace {
+  display: grid;
+  gap: 24px;
+  max-width: 78rem;
+  margin-inline: auto;
+  padding: 32px;
+}
 .heading h1 { font-size: 24px; }
 .heading p, .signIn p { margin-top: 8px; color: var(--color-muted); }
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.summary > div {
+  position: relative;
+  display: flex;
+  min-height: 128px;
+  flex-direction: column-reverse;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 20px 52px 20px 20px;
+  border-radius: 12px;
+  color: #fff;
+}
+.summary dt { font-size: 14px; }
+.summary dd { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.summary svg { position: absolute; top: 20px; right: 16px; opacity: .75; }
+.summaryProjects { background: var(--color-primary); }
+.summaryYears { background: #245474; }
+.summaryLatest { background: #404b73; }
 .panel, .signIn {
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
 }
+.panelHeading { padding: 16px 24px; border-bottom: 1px solid var(--color-border); }
+.panelHeading h2 { font-size: 16px; }
 .toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, .65fr) minmax(0, 1fr);
@@ -108,34 +164,52 @@
 
 .welcome {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
   align-items: center;
   gap: 32px;
-  padding-block: 48px;
+  min-height: 100dvh;
+  max-width: 74rem;
+  margin-inline: auto;
+  padding: 32px;
 }
 .welcomeCopy {
+  display: flex;
+  min-height: 420px;
   min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 48px;
   padding: 48px;
   border-radius: 12px;
-  background: var(--color-primary);
+  background-color: #112d35;
+  background-image: radial-gradient(ellipse at 100% 0%, #17615d 0%, transparent 64%);
   color: #fff;
 }
-.welcomeIcon { width: 56px; height: 56px; margin-bottom: 24px; }
-.welcome h1 { font-size: clamp(1.75rem, 4vw, 2.75rem); line-height: 1.15; overflow-wrap: anywhere; }
-.welcomeCopy p { margin-top: 16px; color: #d5f0ed; }
+.welcome h1 { max-width: 13ch; font-size: clamp(1.75rem, 4vw, 2.75rem); line-height: 1.15; overflow-wrap: anywhere; }
+.welcomeCopy p { max-width: 36ch; margin-top: 16px; color: #d5f0ed; }
 .signIn { padding: 32px; }
 .signIn h2 { font-size: 24px; }
 .signIn p + div { margin-top: 24px; }
 
+@media (max-width: 860px) {
+  .shell[data-sidebar-open="true"] { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: static; min-height: 0; }
+  .navigation { margin-top: 16px; }
+}
 @media (max-width: 720px) {
-  .welcome { grid-template-columns: 1fr; gap: 16px; padding-block: 24px; }
+  .welcome { grid-template-columns: 1fr; align-content: center; gap: 16px; padding-block: 24px; }
   .welcomeCopy, .signIn { padding: 24px; }
-  .workspace { padding-block: 24px; }
+  .welcomeCopy { min-height: 240px; }
+  .workspace { padding: 24px; }
+  .appHeader { padding-inline: 24px; }
+  .summary { grid-template-columns: 1fr; gap: 8px; }
+  .summary > div { min-height: 88px; }
   .toolbar { grid-template-columns: 1fr 1fr; }
   .toolbar label:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 480px) {
-  .headerInner, .workspace, .welcome { padding-inline: 16px; }
+  .appHeader, .workspace, .welcome { padding-inline: 16px; }
+  .appContext { gap: 8px; }
   .heading, .detailHeader { flex-wrap: wrap; }
   .toolbar, .metadata { grid-template-columns: 1fr; }
   .toolbar, .detailHeader, .detailBody { padding: 16px; }
