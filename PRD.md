@@ -33,6 +33,8 @@ Untuk LPJ-06/09, pemilik mengelola aturan global lintas proyek sebagai versi yan
 3. Anggota peneliti memasukkan transaksi dan bukti. Pemilik meninjau penerima, nilai kwitansi dan pajak.
 4. Pemilik memilih tahap, memeriksa rekap serta lampiran, lalu memfinalkan paket LPJ.
 
+Irisan bukti LPJ-05/06/09 menerima penautan PDF/JPG/PNG yang sudah diunggah melalui Drive ke folder bukti proyek yang ditetapkan pemilik. Pemilik/editor menautkan atau mengganti bukti pada transaksi draf sesuai izin server; viewer tidak mengakses panel bukti. Penautan tidak berarti verifikasi dan tidak mengubah keputusan pajak/netto terdahulu. Perubahan bukti memerlukan tinjauan ulang pemilik. Unggah langsung dari aplikasi dan arsip salinan final belum termasuk irisan ini.
+
 ## Batas lingkup
 
 Di luar v1: portal publik, pencairan dana dari aplikasi, integrasi Litapdimas/Coretax/perbankan, pengiriman SPT, tanda tangan elektronik tersertifikasi, OCR, akses offline, dan pemilikan hibah lintas institusi. Perluasan fitur dimulai dari revisi PRD yang disetujui. Data produksi, bukti, dan daftar personel tidak masuk repositori publik.

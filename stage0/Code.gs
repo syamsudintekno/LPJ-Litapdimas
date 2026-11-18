@@ -98,7 +98,7 @@ function dispatch_(request, identify) {
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
       'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
       'transactions.list', 'transactions.save', 'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
-      'taxes.list_rules', 'taxes.save_rule_version'];
+      'taxes.list_rules', 'taxes.save_rule_version', 'attachments.list', 'attachments.get', 'attachments.link'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -153,6 +153,13 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action.startsWith('attachments.')) {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      const role = roleFor(request.project_id);
+      if (!role || role === 'VIEWER') return failure('FORBIDDEN', 'Bukti transaksi hanya tersedia bagi pemilik dan editor proyek.');
+      return attachmentsRpc_(spreadsheetId, user, request, role);
+    }
 
     if (request.action.startsWith('taxes.')) {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');

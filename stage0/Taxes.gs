@@ -60,6 +60,10 @@ function taxContext_(spreadsheetId, projectId, paymentId, owner) {
   const evidence = owner ? attachments.map(row => {
     try {
       if (!/^[\w-]{10,200}$/.test(row.drive_file_id) || !Number.isSafeInteger(row.row_version) || row.row_version < 1) throw new Error();
+      if (PropertiesService.getScriptProperties().getProperty('ATTACHMENTS_ENABLED') === 'true' ||
+          PropertiesService.getScriptProperties().getProperty('EVIDENCE_FOLDERS_JSON')) {
+        return {...row, ...evidenceFile_(projectId, row.drive_file_id), available: true};
+      }
       const file = DriveApp.getFileById(row.drive_file_id);
       if (file.isTrashed() || file.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error();
       return {...row, available: true, name: file.getName(), modified_at: file.getLastUpdated().toISOString()};

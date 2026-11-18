@@ -2,6 +2,7 @@ import {useEffect, useId, useRef, useState} from 'react';
 import {ChevronLeft, ChevronRight, Close, Pencil, Plus, ReceiptText, RefreshCw, Save, Trash2} from '../../components/ui/Icons.jsx';
 import {callProjectRpc} from '../../rpc.js';
 import {TaxReview} from '../taxes/TaxReview.jsx';
+import {TransactionEvidence} from './TransactionEvidence.jsx';
 import layout from '../../Home.module.css';
 import styles from './TransactionWorkspace.module.css';
 
@@ -131,6 +132,11 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
               <div><dt>Potongan</dt><dd>{money(row.totals.withheld_tax_amount)}</dd></div>
               <div><dt>Jumlah diterima</dt><dd>{money(row.totals.net_paid_amount)}</dd></div>
             </dl>
+            {data.can_manage_attachments && <TransactionEvidence endpoint={endpoint} token={token} expire={expire} projectId={project.project_id}
+              transactionId={row.transaction_id} disabled={Boolean(draft)} onLinked={() => {
+                setRevision(value => value + 1); setMessage('Bukti transaksi diperbarui. Muat ulang penilaian pajak sebelum memverifikasi.');
+                requestAnimationFrame(() => heading.current?.focus());
+              }} />}
             <ul className={styles.payments} aria-label={'Pembayaran ' + row.description}>
               {row.payments.map(payment => <li key={payment.payment_detail_id}>
                 <strong>{payment.legal_name}</strong><span>Kwitansi {money(payment.receipt_amount)} · Potongan {money(payment.withheld_tax_amount)} · Diterima {money(payment.net_paid_amount)}</span>

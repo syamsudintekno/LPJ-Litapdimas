@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -37,6 +37,7 @@ function setup() {
   const writes = {batches: 0, fail: false, locked: false};
   const cache = new Map();
   const driveFiles = new Map();
+  const driveFolders = new Map();
   const driveReads = [];
   const context = vm.createContext({
     Session: {getActiveUser: () => ({getEmail: () => email})},
@@ -72,11 +73,18 @@ function setup() {
       computeDigest: (algorithm, text, encoding) => createHash(algorithm).update(text, encoding).digest(),
       base64EncodeWebSafe: bytes => bytes.toString('base64url'),
     },
-    DriveApp: {Access: {PRIVATE: 'PRIVATE'}, getFileById(id) {
+    DriveApp: {Access: {PRIVATE: 'PRIVATE'}, getFolderById(id) {
+      const folder = driveFolders.get(id);
+      if (!folder || folder.fail) throw new Error('Folder uji tidak tersedia.');
+      return {isTrashed: () => folder.trashed || false, getSharingAccess: () => folder.access || 'PRIVATE'};
+    }, getFileById(id) {
       driveReads.push(id);
       const file = driveFiles.get(id);
       if (!file || file.fail) throw new Error('Berkas uji tidak tersedia.');
+      const parents = [...(file.parents || [])];
       return {isTrashed: () => file.trashed || false, getSharingAccess: () => file.access || 'PRIVATE', getName: () => file.name || 'Bukti sintetis',
+        getMimeType: () => file.mime || 'application/pdf', getSize: () => file.size ?? 1024,
+        getParents: () => ({hasNext: () => parents.length > 0, next: () => ({getId: () => parents.shift()})}),
         getLastUpdated: () => new Date(file.modified_at)};
     }},
     Sheets: {Spreadsheets: {get() {
@@ -122,7 +130,7 @@ function setup() {
     assert.equal(response.mimeType, 'application/json');
     return JSON.parse(response.content);
   }
-  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache, driveFiles, driveReads, taxAmount: context.taxAmount_};
+  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache, driveFiles, driveFolders, driveReads, taxAmount: context.taxAmount_};
 }
 
 function setupLogbook() {
@@ -243,6 +251,129 @@ function setupTaxes() {
     env.rpc(account, 'taxes.verify', project, {request_id: id, payload});
   return {...env, created, payment, rule, evidenceId, driveId, preview, decision, verify};
 }
+
+function setupAttachments() {
+  const env = setupTaxes();
+  const folderA = 'synthetic-evidence-folder-A', folderB = 'synthetic-evidence-folder-B';
+  env.properties.ATTACHMENTS_ENABLED = 'true';
+  env.properties.EVIDENCE_FOLDERS_JSON = JSON.stringify({[env.projectA]: folderA, [env.projectB]: folderB});
+  env.driveFolders.set(folderA, {}); env.driveFolders.set(folderB, {});
+  env.driveFiles.get(env.driveId).parents = [folderA];
+  const fileId = 'synthetic-new-proof-A';
+  env.driveFiles.set(fileId, {parents: [folderA], modified_at: '2026-11-18T01:00:00.000Z'});
+  const call = (action, payload, account = env.editor, project = env.projectA, id = randomUUID()) => env.rpc(account, action, project, {payload, request_id: id});
+  const evidence = () => call('attachments.list', {transaction_id: env.created.transaction_id});
+  const payload = () => ({transaction_id: env.created.transaction_id, attachment_id: '', expected_attachment_row_version: 0,
+    expected_transaction_row_version: evidence().data.transaction_row_version, attachment_kind: 'PAYMENT_PROOF', drive_file_id: fileId});
+  return {...env, folderA, folderB, fileId, call, evidence, linkPayload: payload};
+}
+
+test('bukti tertaut atomik oleh editor proyek, retry idempoten dan penggantian memerlukan versi terkini', () => {
+  const {call, evidence, linkPayload, sheets, fileId, writes, owner, created, folderA} = setupAttachments();
+  assert.equal(evidence().data.folder_url, undefined);
+  assert.equal(call('attachments.list', {transaction_id: created.transaction_id}, owner).data.folder_url, 'https://drive.google.com/drive/folders/' + folderA);
+  const payload = linkPayload();
+  const requestId = randomUUID();
+  const first = call('attachments.link', payload, undefined, undefined, requestId);
+  assert.equal(first.data.row_version, 1);
+  assert.equal(first.data.transaction_row_version, payload.expected_transaction_row_version + 1);
+  const batches = writes.batches;
+  assert.deepEqual(call('attachments.link', payload, undefined, undefined, requestId), first);
+  assert.equal(writes.batches, batches);
+  assert.equal(sheets.attachments.filter(row => row[5] === fileId).length, 1);
+  assert.equal(call('attachments.link', {...payload, drive_file_id: 'different-file-id'}, undefined, undefined, requestId).error.code, 'CONFLICT');
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  const replace = {...linkPayload(), attachment_id: first.data.attachment_id, expected_attachment_row_version: 1};
+  assert.equal(call('attachments.link', {...replace, expected_attachment_row_version: 0}).error.code, 'CONFLICT');
+  assert.equal(call('attachments.link', replace).data.row_version, 2);
+  assert.equal(evidence().data.attachments.find(row => row.attachment_id === first.data.attachment_id).row_version, 2);
+  assert.equal(call('attachments.get', {attachment_id: first.data.attachment_id}).data.attachment.available, true);
+  const auditAction = sheets.audit_log[0].indexOf('action');
+  assert.equal(sheets.audit_log.slice(1).filter(row => row[auditAction] === 'attachments.link').length, 2);
+});
+
+test('bukti menolak viewer, konteks lintas proyek, file di luar folder/publik/shortcut, serta konfigurasi tidak sah', () => {
+  const {call, evidence, linkPayload, viewer, editor, owner, evidenceId, projectB, created, fileId, driveFiles, driveReads, driveFolders, folderA, properties, projectA} = setupAttachments();
+  driveReads.length = 0;
+  assert.equal(call('attachments.list', {transaction_id: created.transaction_id}, viewer).error.code, 'FORBIDDEN');
+  assert.equal(call('attachments.list', {transaction_id: created.transaction_id}, editor, projectB).error.code, 'FORBIDDEN');
+  assert.equal(call('attachments.get', {attachment_id: randomUUID()}).error.code, 'NOT_FOUND');
+  assert.equal(call('attachments.get', {attachment_id: evidenceId}, owner, projectB).error.code, 'NOT_FOUND');
+  assert.deepEqual(driveReads, []);
+  const file = driveFiles.get(fileId);
+  for (const invalid of [{parents: ['different-private-folder']}, {access: 'ANYONE_WITH_LINK'}, {trashed: true},
+    {mime: 'application/vnd.google-apps.shortcut'}, {size: 20 * 1024 * 1024 + 1}, {fail: true}]) {
+    driveFiles.set(fileId, {...file, ...invalid});
+    assert.equal(call('attachments.link', linkPayload()).error.code, 'VALIDATION_ERROR', JSON.stringify(invalid));
+  }
+  driveFiles.set(fileId, file);
+  driveFolders.set(folderA, {access: 'DOMAIN'});
+  assert.equal(evidence().error.code, 'TEMPORARY_FAILURE');
+  driveFolders.set(folderA, {});
+  properties.EVIDENCE_FOLDERS_JSON = JSON.stringify({[projectA]: folderA, [projectB]: folderA});
+  assert.equal(evidence().error.code, 'TEMPORARY_FAILURE');
+  properties.ATTACHMENTS_ENABLED = 'false';
+  assert.equal(evidence().error.code, 'TEMPORARY_FAILURE');
+});
+
+test('perubahan bukti mempertahankan keputusan/netto lama, menandai tinjauan ulang dan menolak token pajak lama', () => {
+  const {call, evidence, linkPayload, preview, verify, decision, sheets, rule, evidenceId, writes, driveFiles, properties} = setupAttachments();
+  sheets.tax_rule_versions.push(rule);
+  assert.equal(verify(decision()).ok, true);
+  const snapshot = JSON.stringify(sheets.tax_assessments);
+  const before = decision();
+  const payload = {...linkPayload(), attachment_id: evidenceId, expected_attachment_row_version: 1};
+  writes.fail = true;
+  const state = JSON.stringify(sheets);
+  assert.equal(call('attachments.link', payload).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(JSON.stringify(sheets), state);
+  writes.fail = false;
+  assert.equal(call('attachments.link', payload).ok, true);
+  assert.equal(JSON.stringify(sheets.tax_assessments), snapshot);
+  assert.equal(preview().data.payment.withheld_tax_amount, 45000);
+  assert.equal(preview().data.needs_review, true);
+  assert.equal(verify(before).error.code, 'CONFLICT');
+  driveFiles.get(payload.drive_file_id).parents = ['other-project-folder'];
+  assert.equal(evidence().data.attachments[0].available, false);
+  assert.equal(preview().data.evidence[0].available, false);
+  properties.ATTACHMENTS_ENABLED = 'false';
+  assert.equal(preview().data.evidence[0].available, false);
+  properties.ATTACHMENTS_ENABLED = 'true';
+  const statusColumn = sheets.transactions[0].indexOf('status');
+  sheets.transactions[1][statusColumn] = 'CONFIRMED';
+  assert.equal(evidence().data.can_link, false);
+  assert.equal(call('attachments.link', {...payload, expected_transaction_row_version: evidence().data.transaction_row_version, expected_attachment_row_version: 2}).error.code, 'CONFLICT');
+});
+
+test('penautan bukti ditolak setelah kwitansi/setoran/distribusi, pada arsip, dan untuk file yang sudah tertaut lintas proyek', () => {
+  const {call, linkPayload, sheets, evidence, evidenceId, projectB, fileId, created} = setupAttachments();
+  const paymentId = sheets.payment_details[1][0];
+  const payload = linkPayload();
+  sheets.receipts.push([randomUUID(), paymentId, 'DRAFT']);
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  sheets.receipts.pop();
+  const assessmentId = randomUUID();
+  sheets.tax_assessments.push([assessmentId, paymentId]);
+  sheets.tax_remittance_allocations.push([randomUUID(), randomUUID(), assessmentId, 1]);
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  sheets.tax_remittance_allocations.pop();
+  sheets.tax_assessments.pop();
+  const transactionColumn = sheets.distributions[0].indexOf('transaction_id');
+  const distribution = sheets.distributions[0].map(() => '');
+  distribution[0] = randomUUID();
+  distribution[transactionColumn] = created.transaction_id;
+  sheets.distributions.push(distribution);
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  sheets.distributions.pop();
+  const projectStatus = sheets.projects[0].indexOf('status');
+  sheets.projects[1][projectStatus] = 'ARCHIVED';
+  assert.equal(evidence().data.can_link, false);
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  sheets.projects[1][projectStatus] = 'ACTIVE';
+  sheets.attachments.push([randomUUID(), projectB, '', randomUUID(), 'PAYMENT_PROOF', fileId, 1]);
+  assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
+  assert.equal(call('attachments.get', {attachment_id: evidenceId}, undefined, projectB).error.code, 'FORBIDDEN');
+});
 
 function setupRuleEditor() {
   const env = setupTaxes();
