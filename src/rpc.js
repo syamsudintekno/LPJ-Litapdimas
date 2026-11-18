@@ -9,8 +9,8 @@ export async function loadConfig(signal) {
   return {endpoint: apps_script_url, clientId: google_client_id};
 }
 
-export async function callProjectRpc(endpoint, token, action, projectId, signal) {
-  const request = {api_version: 1, action, request_id: crypto.randomUUID(), project_id: projectId};
+export async function callProjectRpc(endpoint, token, action, projectId, signal, payload, requestId = crypto.randomUUID()) {
+  const request = {api_version: 1, action, request_id: requestId, project_id: projectId, payload};
   const http = await fetch(endpoint, {
     method: 'POST',
     credentials: 'omit',

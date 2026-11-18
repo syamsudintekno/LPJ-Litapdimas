@@ -1,0 +1,49 @@
+.searchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.searchForm label {
+  display: grid;
+  flex: 1 1 240px;
+  max-width: 28rem;
+  min-width: 0;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.searchForm input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.searchForm button { min-height: 44px; }
+.tableArea { overflow-x: auto; }
+.tableArea table { width: 100%; min-width: 400px; border-collapse: collapse; font-size: 14px; }
+.tableArea th, .tableArea td { padding: 12px 24px; text-align: start; }
+.tableArea thead { background: var(--color-bg); }
+.tableArea tbody th { font-weight: 600; }
+.tableArea tbody tr { border-top: 1px solid var(--color-border); }
+.importArea { display: grid; gap: 12px; padding: 24px; border-top: 1px solid var(--color-border); }
+.importArea h3 { font-size: 16px; }
+.importForm { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.importForm label { display: grid; gap: 4px; min-width: 0; font-size: 14px; font-weight: 600; }
+.importForm input { max-width: 100%; }
+.help { color: var(--color-muted); font-size: 14px; }
+.importError { color: var(--color-danger); }
+
+@media (max-width: 480px) {
+  .searchForm, .tableArea th, .tableArea td, .importArea { padding-inline: 16px; }
+}

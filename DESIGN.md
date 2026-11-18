@@ -37,6 +37,7 @@ Skala jarak 4, 8, 12, 16, 24, 32, 48 px. Radius elemen 8 px, panel 12 px. Ukuran
 | FormField dan PersonPicker | Label terlihat, bantuan dekat field, dan pesan kesalahan spesifik. Tampilkan nama, kategori dan unit seperlunya untuk membedakan orang dengan nama sama. |
 | SetupWizard | Langkah Identitas → Tim → Pejabat → Tahap LPJ → Tinjau. Tombol kembali mempertahankan draf. Ringkasan menampilkan data yang harus dilengkapi sebelum aktivasi. |
 | DataTable | Header semantik, filter eksplisit dan navigasi halaman. Pada ponsel, tabel padat boleh bergulir horizontal dalam wrapper berlabel. Utamakan kolom identitas, status, dan nominal. |
+| RAB proyek | Tampilkan plafon resmi, total rincian versi terpilih, dan selisih bersama. Riwayat versi dapat dipilih dari detail proyek. Pemilik mengonfirmasi pengesahan setelah meninjau rincian. |
 | ImportPreview | Tampilkan valid, duplikat dan perlu koreksi dengan nomor baris. Pisahkan pratinjau dari tindakan impor. |
 | TaxSummary | Tampilkan nominal kwitansi, potongan, tambahan pajak bila ada, dan jumlah diterima dengan label tersendiri. Pemilik dapat memeriksa dasar aturan, penanda verifikasi, bukti dan alasan koreksi. |
 | StatusBadge dan Notice | Label teks untuk Draf, Perlu verifikasi, Terverifikasi, dan Final. Kesalahan simpan tetap terlihat sampai ditangani. |

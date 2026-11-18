@@ -12,6 +12,8 @@ Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHI
 
 ## Uji akses dan hosting
 
+Tahap 1 mencakup wizard pembuatan dan aktivasi proyek (LPJ-01), pencarian dan impor CSV/XLSX Master Personel (LPJ-02), serta draf, pengesahan, dan riwayat versi RAB (LPJ-03). Uji integrasi di deployment sintetis mengikuti [penyiapan wizard](stage0/README.md#menyiapkan-uji-wizard-lpj-01), [penyiapan impor](stage0/README.md#menyiapkan-uji-impor-master-personel-lpj-02), dan [penyiapan RAB](stage0/README.md#menyiapkan-uji-versi-rab-lpj-03). Penautan transaksi ke item RAB diuji bersama alur transaksi.
+
 Uji antarmuka dari GitHub Pages dengan Apps Script sebagai kandidat layanan server dan Google Sheets privat berisi data sintetis. Jalankan uji tanpa mengaktifkan billing. Gunakan satu akun pemilik, dua akun anggota peneliti, satu akun Google tanpa undangan, dan dua proyek uji dari tahun berbeda. Catat cara layanan memverifikasi identitas, konfigurasi akses dari origin GitHub Pages, serta kebutuhan izin Sheets dan Drive. Simpan email akun uji dan ID berkas di lingkungan privat.
 
 | Kasus | Hasil yang harus diamati |

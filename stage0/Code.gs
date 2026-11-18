@@ -18,7 +18,7 @@ function doPost(event) {
   let body;
   try {
     const raw = event?.postData?.contents;
-    if (typeof raw !== 'string' || raw.length > 10000) throw new Error();
+    if (typeof raw !== 'string' || raw.length > 500000) throw new Error();
     body = JSON.parse(raw);
   } catch {
     return json_(failure_(null, 'VALIDATION_ERROR', 'Permintaan uji tidak valid.'));
@@ -83,7 +83,7 @@ function dispatch_(request, identify) {
       return failure('TEMPORARY_FAILURE', 'Konfigurasi uji belum lengkap.');
     }
 
-    const read = (name, fields) => rows_(spreadsheetId, name, fields);
+    const read = (name, fields, optionalFields) => rows_(spreadsheetId, name, fields, optionalFields);
     const users = read('users', ['user_id', 'login_email', 'system_role', 'active']);
     const matches = users.filter(user => normalizeEmail_(user.login_email) === email);
     const user = matches.length === 1 ? matches[0] : null;
@@ -92,13 +92,48 @@ function dispatch_(request, identify) {
       return failure('FORBIDDEN', 'Akun tidak memiliki akses.');
     }
 
-    const actions = ['projects.list', 'projects.get', 'stage0.write_probe', 'taxes.verify'];
+    const actions = ['projects.list', 'projects.get', 'projects.save', 'projects.activate',
+      'people.search', 'people.preview_import', 'people.commit_import', 'budgets.list_versions',
+      'budgets.save_version', 'budgets.approve_version', 'stage0.write_probe', 'taxes.verify'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
     }
 
     const owner = user.system_role === 'OWNER';
+    const success = data => ({ok: true, request_id: requestId, data});
+
+    if (['projects.save', 'projects.activate'].includes(request.action)) {
+      if (!owner) return failure('FORBIDDEN', 'Hanya pemilik yang dapat mengelola proyek.');
+      return writeProject_(spreadsheetId, user, request);
+    }
+
+    if (['people.preview_import', 'people.commit_import'].includes(request.action)) {
+      if (!owner) return failure('FORBIDDEN', 'Hanya pemilik yang dapat mengimpor Master Personel.');
+      return importPeople_(spreadsheetId, user, request);
+    }
+
+    if (request.action === 'people.search') {
+      if (!owner) return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk mengakses Master Personel.');
+      const query = request.payload?.query;
+      if (typeof query !== 'string' || query.length > 120) {
+        return failure('VALIDATION_ERROR', 'Kata kunci pencarian maksimal 120 karakter.');
+      }
+      const keyword = query.trim().toLowerCase();
+      const people = read('people', ['person_id', 'person_kind', 'display_name'], ['unit_name', 'active']);
+      const matches = people.filter(person =>
+        person.person_id && person.display_name &&
+        (person.active === true || !Object.prototype.hasOwnProperty.call(person, 'active')) &&
+        [person.display_name, person.unit_name].some(value => String(value ?? '').toLowerCase().includes(keyword))
+      ).sort((first, second) => first.display_name.localeCompare(second.display_name, 'id-ID') ||
+        first.person_id.localeCompare(second.person_id));
+      return success({
+        people: matches.slice(0, 50).map(({person_id, person_kind, display_name, unit_name}) =>
+          ({person_id, person_kind, display_name, unit_name: unit_name ?? ''})),
+        total: matches.length,
+      });
+    }
+
     const memberships = owner ? [] : read('project_members', [
       'project_id', 'user_id', 'project_role', 'revoked_at',
     ]).filter(member => member.user_id === user.user_id);
@@ -109,7 +144,18 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
-    const success = data => ({ok: true, request_id: requestId, data});
+
+    if (request.action.startsWith('budgets.')) {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
+        return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      }
+      const role = roleFor(request.project_id);
+      if (!role || (request.action === 'budgets.save_version' && role === 'VIEWER') ||
+          (request.action === 'budgets.approve_version' && role !== 'OWNER')) {
+        return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan RAB ini.');
+      }
+      return budgetRpc_(spreadsheetId, user, request);
+    }
 
     if (request.action !== 'projects.list') {
       if (typeof request.project_id !== 'string' || !request.project_id.trim()) {
@@ -122,9 +168,14 @@ function dispatch_(request, identify) {
       }
     }
 
-    const projects = read('projects', ['project_id', 'fiscal_year', 'title', 'project_code']);
+    const projects = read('projects', ['project_id', 'fiscal_year', 'title', 'project_code'], ['status', 'row_version']);
     if (request.action === 'projects.list') {
-      return success({projects: projects.filter(project => roleFor(project.project_id))});
+      return success({
+        projects: projects.filter(project => roleFor(project.project_id)),
+        system_role: user.system_role,
+        can_create_project: owner && PropertiesService.getScriptProperties().getProperty('PROJECT_WRITES_ENABLED') === 'true',
+        can_import_people: owner && PropertiesService.getScriptProperties().getProperty('PEOPLE_IMPORT_ENABLED') === 'true',
+      });
     }
 
     const project = projects.find(row => row.project_id === request.project_id);
@@ -140,7 +191,8 @@ function dispatch_(request, identify) {
       assignment_role: row.assignment_role,
       display_name: people.find(person => person.person_id === row.person_id)?.display_name ?? '',
     }));
-    return success({project, access_role: roleFor(project.project_id), personnel});
+    return success({project, access_role: roleFor(project.project_id), personnel,
+      budgets_enabled: PropertiesService.getScriptProperties().getProperty('BUDGETS_ENABLED') === 'true'});
   } catch (error) {
     return failure('TEMPORARY_FAILURE', 'Data uji tidak dapat dibaca. Periksa konfigurasi.');
   }
@@ -150,14 +202,24 @@ function normalizeEmail_(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-function rows_(spreadsheetId, name, fields) {
+function requestDigest_(value) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, JSON.stringify(value), Utilities.Charset.UTF_8));
+}
+
+function rows_(spreadsheetId, name, fields, optionalFields = []) {
   const result = Sheets.Spreadsheets.Values.get(spreadsheetId, name + '!A:Z', {
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
   const [headers = [], ...values] = result.values ?? [];
   const indexes = fields.map(field => headers.indexOf(field));
   if (indexes.includes(-1)) throw new Error('Kolom fixture tidak lengkap.');
+  const columns = fields.map((field, index) => [field, indexes[index]]);
+  for (const field of optionalFields) {
+    const index = headers.indexOf(field);
+    if (index !== -1) columns.push([field, index]);
+  }
   return values.filter(row => row[0]).map(row =>
-    Object.fromEntries(fields.map((field, index) => [field, row[indexes[index]] ?? '']))
+    Object.fromEntries(columns.map(([field, index]) => [field, row[index] ?? '']))
   );
 }

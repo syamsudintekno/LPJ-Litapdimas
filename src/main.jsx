@@ -2,6 +2,12 @@ import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, RefreshCw, Search, Users} from 'lucide-react';
 import {callProjectRpc, loadConfig, loadGoogleSignIn} from './rpc.js';
+import {PeopleDirectory} from './features/people/PeopleDirectory.jsx';
+import {ProjectWizard} from './features/projects/ProjectWizard.jsx';
+import {ProjectActivation} from './features/projects/ProjectActivation.jsx';
+import {BudgetWorkspace} from './features/budgets/BudgetWorkspace.jsx';
+import litapdimasLogo from './assets/login/litapdimas.png';
+import syekhWasilLogo from './assets/login/syekh-wasil.png';
 import './styles/tokens.css';
 import './styles/globals.css';
 import styles from './Home.module.css';
@@ -15,9 +21,9 @@ function Brand() {
   </div>;
 }
 
-function AppShell({children, onSignOut}) {
+function AppShell({children, onSignOut, canManagePeople}) {
   const [sidebarOpen, setSidebarOpen] = useState(() => matchMedia('(min-width: 861px)').matches);
-  const [section, setSection] = useState(() => location.hash === '#daftar-proyek' ? 'daftar-proyek' : 'ringkasan');
+  const [section, setSection] = useState(() => location.hash.slice(1) || 'ringkasan');
 
   function navigate(target) {
     setSection(target);
@@ -35,6 +41,9 @@ function AppShell({children, onSignOut}) {
         <a href="#daftar-proyek" aria-current={section === 'daftar-proyek' ? 'location' : undefined} onClick={() => navigate('daftar-proyek')}>
           <FolderOpen size={18} aria-hidden="true" /> Daftar proyek
         </a>
+        {canManagePeople && <a href="#master-personel" aria-current={section === 'master-personel' ? 'location' : undefined} onClick={() => navigate('master-personel')}>
+          <Users size={18} aria-hidden="true" /> Master Personel
+        </a>}
       </nav>
     </aside>
     <div className={styles.shellBody}>
@@ -77,17 +86,21 @@ function useProjectData(endpoint, token, action, projectId, revision, expire) {
   return state?.key === key && state.token === token ? state : null;
 }
 
-function Workspace({endpoint, token, expire}) {
+function Workspace({endpoint, token, expire, onSignOut}) {
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('');
   const [selected, setSelected] = useState(() => new URLSearchParams(location.search).get('project_id') || '');
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const wizardButton = useRef(null);
   const detailHeading = useRef(null);
   const projectSelect = useRef(null);
   const list = useProjectData(endpoint, token, 'projects.list', undefined, revision, expire);
   const detail = useProjectData(endpoint, token, 'projects.get', selected, detailRevision, expire);
   const projects = list?.data?.projects ?? [];
+  const canManagePeople = list?.data?.system_role === 'OWNER';
+  const canCreateProject = list?.data?.can_create_project === true;
   const years = [...new Set(projects.map(project => String(project.fiscal_year)))].sort((a, b) => Number(b) - Number(a));
   const activeYear = years.includes(year) ? year : '';
   const search = query.trim().toLocaleLowerCase('id-ID');
@@ -110,16 +123,28 @@ function Workspace({endpoint, token, expire}) {
     setDetailRevision(value => value + 1);
   }
 
-  return <main id="ringkasan" tabIndex={-1} className={styles.workspace}>
+  const content = <main id="ringkasan" tabIndex={-1} className={styles.workspace}>
     <div className={styles.heading}>
       <div>
         <h1>Proyek penelitian</h1>
         <p>Telusuri proyek dan lihat personel LPJ per tahun anggaran.</p>
       </div>
-      <button className={styles.secondary} type="button" onClick={updateProjects} disabled={!list}>
-        <RefreshCw size={16} aria-hidden="true" /> Muat ulang
-      </button>
+      <div className={styles.headingActions}>
+        {canCreateProject && <button ref={wizardButton} className={styles.primary} type="button"
+          aria-expanded={wizardOpen} disabled={wizardOpen} onClick={() => setWizardOpen(true)}>Buat proyek</button>}
+        <button className={styles.secondary} type="button" onClick={updateProjects} disabled={!list}>
+          <RefreshCw size={16} aria-hidden="true" /> Muat ulang
+        </button>
+      </div>
     </div>
+
+    {wizardOpen && <ProjectWizard endpoint={endpoint} token={token} expire={expire}
+      onClose={() => {setWizardOpen(false); requestAnimationFrame(() => wizardButton.current?.focus());}}
+      onSaved={id => {
+        setWizardOpen(false);
+        setRevision(value => value + 1);
+        openProject(id);
+      }} />}
 
     {list?.data && <dl className={styles.summary} aria-label="Ringkasan proyek">
       <div className={styles.summaryProjects}>
@@ -207,6 +232,12 @@ function Workspace({endpoint, token, expire}) {
           <div><dt>Tahun anggaran</dt><dd>{detail.data.project.fiscal_year}</dd></div>
           <div><dt>Hak akses</dt><dd>{roleLabels[detail.data.access_role] ?? detail.data.access_role}</dd></div>
         </dl>
+        {detail.data.project.status && <p className={styles.projectStatus}>
+          Status proyek · {{DRAFT: 'Draf', ACTIVE: 'Aktif', ARCHIVED: 'Diarsipkan'}[detail.data.project.status] ?? detail.data.project.status}
+        </p>}
+        {canCreateProject && detail.data.access_role === 'OWNER' && detail.data.project.status === 'DRAFT' &&
+          <ProjectActivation key={detail.data.project.project_id} endpoint={endpoint} token={token}
+            expire={expire} project={detail.data.project} onActivated={updateProjects} />}
         <h3><Users size={18} aria-hidden="true" /> Personel LPJ</h3>
         {detail.data.personnel.length ? <ul className={styles.personnel}>
           {detail.data.personnel.map((person, index) => <li key={index}>
@@ -214,29 +245,44 @@ function Workspace({endpoint, token, expire}) {
             <span>{person.assignment_role}</span>
           </li>)}
         </ul> : <p>Belum ada personel untuk proyek ini.</p>}
+        {detail.data.budgets_enabled && <BudgetWorkspace key={detail.data.project.project_id}
+          endpoint={endpoint} token={token} expire={expire} projectId={detail.data.project.project_id} role={detail.data.access_role} />}
       </div>}
     </section>
+    {canManagePeople && <PeopleDirectory endpoint={endpoint} token={token} expire={expire}
+      canImport={list.data.can_import_people === true} />}
   </main>;
+
+  return <AppShell onSignOut={onSignOut} canManagePeople={canManagePeople}>
+    {content}
+  </AppShell>;
 }
 
 function SignIn({message, error, ready}) {
   const button = useRef(null);
   useEffect(() => {
-    if (ready) window.google.accounts.id.renderButton(button.current, {type: 'standard', size: 'large', text: 'signin_with'});
+    if (ready) window.google.accounts.id.renderButton(button.current, {
+      type: 'standard', theme: 'outline', size: 'large', text: 'signin_with',
+      shape: 'pill', width: '232', locale: 'id',
+    });
   }, [ready]);
 
   return <main className={styles.welcome}>
     <div className={styles.welcomeCopy}>
-      <Brand />
+      <span className={styles.loginBrand}>LPJ Litapdimas</span>
       <div>
-        <h1>Pertanggungjawaban penelitian</h1>
-        <p>Ruang kerja bagi pemilik dan anggota peneliti untuk mengakses proyek dan personel LPJ.</p>
+        <h1><span>Pertanggungjawaban</span>{' '}<span>Penelitian</span></h1>
+        <p>Karena penelitian yang hebat selalu diakhiri dengan LPJ yang tepat</p>
       </div>
     </div>
     <section className={styles.signIn} aria-labelledby="sign-in-heading">
+      <div className={styles.loginLogos}>
+        <div><img className={styles.litapdimasLogo} src={litapdimasLogo} alt="Litapdimas" width="56" height="56" /></div>
+        <div><img src={syekhWasilLogo} alt="Syekh Wasil" width="56" height="56" /></div>
+      </div>
       <h2 id="sign-in-heading">Masuk ke ruang kerja</h2>
       <p>Gunakan akun Google yang terdaftar untuk proyek Anda.</p>
-      <div ref={button} />
+      <div className={styles.googleButton} ref={button} hidden={!ready} />
       {error ? <p role="alert" className={styles.signInError}>{error}</p> :
         message && <p role="status">{message}</p>}
     </section>
@@ -280,9 +326,8 @@ function App() {
     window.google?.accounts.id.disableAutoSelect();
   }
 
-  return token ? <AppShell onSignOut={signOut}>
-    <Workspace endpoint={endpoint} token={token} expire={expire} />
-  </AppShell> : <SignIn ready={ready} error={error} message={message || (!ready ? 'Menyiapkan login…' : '')} />;
+  return token ? <Workspace endpoint={endpoint} token={token} expire={expire} onSignOut={signOut} /> :
+    <SignIn ready={ready} error={error} message={message || (!ready ? 'Menyiapkan login…' : '')} />;
 }
 
 createRoot(document.getElementById('root')).render(<App />);

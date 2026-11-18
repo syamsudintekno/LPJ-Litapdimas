@@ -16,9 +16,45 @@ Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets 
 
 Pada 18 November 2026, [halaman uji GitHub Pages](https://syamsudintekno.github.io/LPJ-Litapdimas/) berhasil dibuka. Setelah login Google sebagai pemilik, browser menampilkan daftar dan detail proyek sintetis 2023 dan 2025 dengan peran `OWNER`. Uji hak tulis dan hak verifikasi pajak untuk proyek 2023 berhasil. Hasil ini memverifikasi bahwa browser GitHub Pages dapat membaca respons Apps Script untuk sesi pemilik. Uji kedua anggota, akun tanpa undangan, perubahan peran dan pencabutan, serta akses langsung ke Sheets dan Drive masih tertunda.
 
+## Menyiapkan uji wizard LPJ-01
+
+Untuk uji penulisan gunakan deployment Apps Script dan spreadsheet privat khusus data sintetis. Tambahkan `Projects.gs` bersama `Code.gs`. Manifest saat ini meminta scope tulis Sheets. Untuk mereproduksi prototipe baca saja, gunakan scope `https://www.googleapis.com/auth/spreadsheets.readonly` dan biarkan `PROJECT_WRITES_ENABLED` kosong.
+
+Pertahankan data fixture, lalu lengkapi header berikut sebelum menjalankan wizard. Kolom pertama setiap tab tetap PK. Baris data lama boleh tetap kosong pada kolom baru.
+
+| Tab | Header |
+| --- | --- |
+| `projects` | `project_id, fiscal_year, title, project_code, official_ceiling_amount, status, active_budget_version_id, row_version, created_at, updated_at` |
+| `project_people` | `project_person_id, project_id, person_id, assignment_role, row_version, created_at, updated_at` |
+| `report_stages` | `report_stage_id, project_id, sequence_no, label, target_bps, cutoff_date, status, row_version, created_at, updated_at` |
+| `audit_log` | `audit_id, request_id, user_id, project_id, action, entity_type, entity_id, occurred_at, change_summary` |
+| `mutation_requests` | `request_id, user_id, action, payload_digest, result_ref, status, row_version, created_at, updated_at` |
+
+Jika header pertama `project_people` lama adalah `project_id`, sisipkan kolom `project_person_id` di depannya dan berikan UUID unik pada setiap penugasan lama. Setelah deployment uji menunjuk ke spreadsheet sintetis dan skemanya siap, set Script Property `PROJECT_WRITES_ENABLED=true`. Buka halaman sebagai pemilik dan uji simpan draf, aktivasi, serta penolakan dari akun anggota.
+
+## Menyiapkan uji impor Master Personel LPJ-02
+
+Tambahkan `PeopleImport.gs` bersama `Code.gs` dan `Projects.gs` pada deployment uji sintetis dengan scope tulis. Gunakan tab `audit_log` dan `mutation_requests` di atas. Lengkapi header `people` menjadi `person_id, person_kind, display_name, nip, nim, unit_name, civil_service_grade, active, row_version, created_at, updated_at`. Tetapkan `active` sebagai boolean `TRUE` pada entri sintetis lama yang masih aktif. Aktifkan Script Property `PEOPLE_IMPORT_ENABLED=true` untuk menampilkan impor bagi pemilik.
+
+Unduh tab sumber sebagai CSV, atau gunakan XLSX dengan tab sumber di posisi pertama. Berkas dosen dengan header `NIP`, `NAMA`, `UNIT`, dan `PANGKAT` dipetakan ke NIP, nama, unit, dan golongan dengan kategori `DOSEN`. Subheader PDDIKTI atau golongan dilewati. Untuk format kanonik, gunakan nama kolom pada skema `people` dan isi jenis personel. Sertakan UUID teks, NIP, atau NIM untuk deduplikasi. Simpan kolom ID sebagai teks di Excel. Buka **Master Personel → Impor personel → Pratinjau**, periksa nomor baris, lalu impor baris valid. Batasnya 1.000 baris dan 5 MB per berkas.
+
+Gunakan data dosen asli setelah deployment mempunyai verifikasi identitas produksi dan penyimpanan berakses terbatas. Data sumber dan hasil impor disimpan di luar repositori.
+
+## Menyiapkan uji versi RAB LPJ-03
+
+Tambahkan `Budgets.gs` pada deployment sintetis yang sudah menyiapkan tab `projects`, `audit_log`, dan `mutation_requests`. Buat tab di bawah dan tetapkan `BUDGETS_ENABLED=true` setelah skema siap.
+
+| Tab | Header |
+| --- | --- |
+| `budget_versions` | `budget_version_id, project_id, version_no, status, approved_by_user_id, approved_at, row_version, created_at, updated_at` |
+| `budget_categories` | `budget_category_id, budget_version_id, category_code, label, sort_order, row_version, created_at, updated_at` |
+| `budget_items` | `budget_item_id, budget_category_id, label, volume, frequency, unit, unit_price_amount, row_version, created_at, updated_at` |
+
+Buka proyek draf atau aktif yang memiliki plafon resmi. Buat dan sahkan versi pertama, susun revisi dari versi itu, lalu sahkan revisinya. Pastikan versi sebelumnya berstatus **Digantikan** dan rincian lamanya masih dapat dibaca. Uji editor dapat membuat draf tetapi ditolak saat mengesahkan, serta pembaca hanya dapat membuka riwayat proyek yang ditugaskan.
+
 ## Prototipe awal HTML Service
 
-Langkah deployment di bawah berlaku untuk reproduksi prototipe awal. Gunakan proyek Apps Script tersendiri dan ubah `webapp.access` di manifest menjadi `DOMAIN` untuk skenario tersebut.
+Langkah deployment di bawah berlaku untuk reproduksi prototipe awal. Gunakan proyek Apps Script tersendiri, ubah `webapp.access` di manifest menjadi `DOMAIN` dan gunakan scope Sheets baca saja untuk skenario tersebut.
 
 Prototipe LPJ-09 membaca dua proyek sintetis, A tahun 2023 dan B tahun 2025. Anggota A adalah `EDITOR` proyek A dan anggota B adalah `VIEWER` proyek B. PPK, Bendahara Pengeluaran, dan mahasiswa terkait melalui `people` dan `project_people`. Fixture akun aplikasi hanya berisi pemilik dan dua anggota.
 

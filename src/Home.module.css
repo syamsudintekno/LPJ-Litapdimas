@@ -76,6 +76,20 @@
   padding: 32px;
 }
 .heading h1 { font-size: 24px; }
+.headingActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.primary {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+.projectStatus { margin-bottom: 12px; font-weight: 600; }
+.activation { display: grid; justify-items: start; gap: 8px; margin-bottom: 24px; }
+.activation [role="alert"] { color: var(--color-danger); }
 .heading p, .signIn p { margin-top: 8px; color: var(--color-muted); }
 .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .summary > div {
@@ -164,9 +178,9 @@
 
 .welcome {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
-  align-items: center;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1.24fr) minmax(0, .76fr);
+  align-content: center;
+  gap: 24px;
   min-height: 100dvh;
   max-width: 74rem;
   margin-inline: auto;
@@ -174,32 +188,65 @@
 }
 .welcomeCopy {
   display: flex;
-  min-height: 420px;
+  min-height: 468px;
   min-width: 0;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   gap: 48px;
   padding: 48px;
+  container-type: inline-size;
   border-radius: 12px;
-  background-color: #112d35;
-  background-image: radial-gradient(ellipse at 100% 0%, #17615d 0%, transparent 64%);
+  background-color: #0d443f;
+  background-image: linear-gradient(115deg, #082f29d9, #07534c45), url('./assets/login/office.jpg');
+  background-position: center;
+  background-size: cover;
   color: #fff;
+  box-shadow: 0 16px 36px #0b362924;
 }
-.welcome h1 { max-width: 13ch; font-size: clamp(1.75rem, 4vw, 2.75rem); line-height: 1.15; overflow-wrap: anywhere; }
-.welcomeCopy p { max-width: 36ch; margin-top: 16px; color: #d5f0ed; }
-.signIn { padding: 32px; }
+.loginBrand { font-size: 14px; font-weight: 700; color: #d5f0ed; }
+.welcome h1 { font-size: clamp(1.1875rem, 7.5cqw, 3.125rem); line-height: 1.13; letter-spacing: -.035em; }
+.welcome h1 span { display: block; }
+.welcomeCopy p { max-width: 38ch; margin-top: 16px; color: #e3f6f1; }
+.signIn {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-width: 0;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 12px 32px #0f172a0b;
+}
+.loginLogos { display: flex; gap: 12px; margin-bottom: 24px; }
+.loginLogos > div {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border: 1px solid #dfe9e5;
+  border-radius: 12px;
+  background: #f8faf9;
+}
+.loginLogos img { display: block; width: 56px; height: 56px; object-fit: contain; }
+.litapdimasLogo { border-radius: 50%; }
 .signIn h2 { font-size: 24px; }
-.signIn p + div { margin-top: 24px; }
+.signIn p { max-width: 32ch; }
+.googleButton { margin-top: 24px; border-radius: 999px; box-shadow: 0 5px 14px #153c3226; }
+.googleButton:focus-within { outline: 2px solid var(--color-primary); outline-offset: 4px; }
 
 @media (max-width: 860px) {
   .shell[data-sidebar-open="true"] { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: static; min-height: 0; }
   .navigation { margin-top: 16px; }
 }
+@media (max-width: 840px) and (min-width: 721px) {
+  .welcome { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .welcomeCopy, .signIn { padding: 24px; }
+}
 @media (max-width: 720px) {
   .welcome { grid-template-columns: 1fr; align-content: center; gap: 16px; padding-block: 24px; }
   .welcomeCopy, .signIn { padding: 24px; }
-  .welcomeCopy { min-height: 240px; }
+  .welcomeCopy { min-height: 240px; gap: 24px; }
+  .signIn { min-height: 280px; }
   .workspace { padding: 24px; }
   .appHeader { padding-inline: 24px; }
   .summary { grid-template-columns: 1fr; gap: 8px; }
