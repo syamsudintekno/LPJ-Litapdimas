@@ -20,7 +20,8 @@ function activityInput_(payload) {
     activity: {activity_kind: activity.activity_kind.trim(), title: activity.title.trim(),
       activity_date: activity.activity_date, location: activity.location.trim()},
     agenda: agenda.map(item => ({start_time: item.start_time, end_time: item.end_time,
-      title: item.title.trim(), speaker_person_id: item.speaker_person_id || ''})),
+      title: item.title.trim(), speaker_person_id: item.speaker_person_id || '',
+      ...(item.agenda_item_id === undefined ? {} : {agenda_item_id: item.agenda_item_id})})),
   };
 }
 
@@ -33,11 +34,13 @@ function activityRpc_(spreadsheetId, user, request, role) {
   }
   const save = action === 'activities.save';
   const get = action === 'activities.get';
+  const edit = save && payload?.activity_id !== undefined;
   const input = save ? activityInput_(payload) : null;
-  if ((save && (!PROJECT_UUID_.test(request_id) || !input || payload.activity_id !== undefined ||
-      payload.activity?.activity_id !== undefined)) ||
+  if ((save && (!PROJECT_UUID_.test(request_id) || !input || payload.activity?.activity_id !== undefined ||
+      (edit && (typeof payload.activity_id !== 'string' || !PROJECT_UUID_.test(payload.activity_id) ||
+        !Number.isSafeInteger(payload.expected_row_version) || payload.expected_row_version < 1)))) ||
       (get && (typeof payload?.activity_id !== 'string' || !PROJECT_UUID_.test(payload.activity_id)))) {
-    return fail('VALIDATION_ERROR', 'Periksa kegiatan dan urutan rundown. Penyuntingan kegiatan belum tersedia.');
+    return fail('VALIDATION_ERROR', 'Periksa kegiatan, versi, dan urutan rundown.');
   }
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return fail('TEMPORARY_FAILURE', 'Kegiatan sedang diproses. Coba lagi.');
@@ -55,7 +58,9 @@ function activityRpc_(spreadsheetId, user, request, role) {
       const agenda = rows_(spreadsheetId, 'agenda_items', AGENDA_FIELDS_)
         .filter(row => row.activity_id === activity.activity_id).sort((a, b) => a.start_time.localeCompare(b.start_time));
       const people = agenda.some(item => item.speaker_person_id) ? rows_(spreadsheetId, 'people', ['person_id', 'display_name']) : [];
-      return ok({activity, participants_enabled: PropertiesService.getScriptProperties().getProperty('PARTICIPANTS_ENABLED') === 'true',
+      return ok({activity, can_write: activity.status === 'DRAFT' && ['OWNER', 'EDITOR'].includes(role) && ['DRAFT', 'ACTIVE'].includes(project.status),
+        reports_enabled: PropertiesService.getScriptProperties().getProperty('ACTIVITY_REPORTS_ENABLED') === 'true',
+        participants_enabled: PropertiesService.getScriptProperties().getProperty('PARTICIPANTS_ENABLED') === 'true',
         agenda: agenda.map(item => ({...item,
         speaker_display_name: people.find(person => person.person_id === item.speaker_person_id)?.display_name || '',
       }))});
@@ -71,6 +76,23 @@ function activityRpc_(spreadsheetId, user, request, role) {
     if (!['DRAFT', 'ACTIVE'].includes(project.status)) {
       return fail('VALIDATION_ERROR', 'Kegiatan memerlukan proyek draf atau aktif.');
     }
+    const before = edit ? rows_(spreadsheetId, 'activities', ACTIVITY_FIELDS_)
+      .find(row => row.activity_id === payload.activity_id && row.project_id === project_id) : null;
+    if (edit && !before) return fail('NOT_FOUND', 'Kegiatan tidak ditemukan dalam proyek ini.');
+    if (edit && (before.status !== 'DRAFT' || before.row_version !== payload.expected_row_version)) {
+      return fail('CONFLICT', 'Kegiatan sudah berubah atau tidak dapat disunting. Muat ulang kegiatan.');
+    }
+    const oldAgenda = edit ? rows_(spreadsheetId, 'agenda_items', AGENDA_FIELDS_).filter(row => row.activity_id === before.activity_id) : [];
+    const expected = payload?.expected_agenda_versions;
+    if (edit && (!expected || typeof expected !== 'object' || Array.isArray(expected) ||
+        Object.keys(expected).length !== oldAgenda.length || oldAgenda.some(row => expected[row.agenda_item_id] !== row.row_version))) {
+      return fail('CONFLICT', 'Versi rundown sudah berubah. Muat ulang kegiatan.');
+    }
+    const existingIds = input.agenda.filter(item => item.agenda_item_id !== undefined).map(item => item.agenda_item_id);
+    if (new Set(existingIds).size !== existingIds.length || existingIds.some(id =>
+        typeof id !== 'string' || !PROJECT_UUID_.test(id) || !oldAgenda.some(row => row.agenda_item_id === id))) {
+      return fail('VALIDATION_ERROR', 'ID sesi tidak sesuai dengan kegiatan ini.');
+    }
     const speakerIds = input.agenda.map(item => item.speaker_person_id).filter(Boolean);
     if (speakerIds.length) {
       const people = rows_(spreadsheetId, 'people', ['person_id'], ['active']);
@@ -81,21 +103,28 @@ function activityRpc_(spreadsheetId, user, request, role) {
     }
     const time = new Date().toISOString();
     const stamp = {row_version: 1, created_at: time, updated_at: time};
-    const activity_id = Utilities.getUuid();
-    const result = {activity_id, status: 'DRAFT', row_version: 1};
+    const activity_id = edit ? before.activity_id : Utilities.getUuid();
+    const result = {activity_id, status: 'DRAFT', row_version: edit ? before.row_version + 1 : 1};
+    const updates = edit ? [['activities', activity_id, {...input.activity, row_version: result.row_version, updated_at: time}]] : [];
+    const deletes = oldAgenda.filter(row => !existingIds.includes(row.agenda_item_id)).map(row => ['agenda_items', row.agenda_item_id]);
     const adds = {
-      activities: [{...input.activity, ...result, project_id, ...stamp}],
       audit_log: [{audit_id: Utilities.getUuid(), request_id, user_id: user.user_id, project_id, action,
         entity_type: 'activity', entity_id: activity_id, occurred_at: time,
-        change_summary: JSON.stringify({status: 'DRAFT', agenda_count: input.agenda.length})}],
+        change_summary: JSON.stringify({before, after: {...input.activity, ...result}, agenda_count: input.agenda.length,
+          removed_agenda_ids: deletes.map(([, id]) => id), previous_agenda_digest: requestDigest_(oldAgenda), agenda_digest: requestDigest_(input.agenda)})}],
       mutation_requests: [{request_id, user_id: user.user_id, action, payload_digest: digest,
         result_ref: JSON.stringify(result), status: 'COMPLETED', ...stamp}],
     };
-    if (input.agenda.length) adds.agenda_items = input.agenda.map(item => ({
-      agenda_item_id: Utilities.getUuid(), activity_id, ...item, ...stamp,
-    }));
+    if (!edit) adds.activities = [{...input.activity, ...result, project_id, ...stamp}];
+    const newItems = [];
+    for (const item of input.agenda) {
+      const old = oldAgenda.find(row => row.agenda_item_id === item.agenda_item_id);
+      if (old) updates.push(['agenda_items', old.agenda_item_id, {...item, row_version: old.row_version + 1, updated_at: time}]);
+      else newItems.push({agenda_item_id: Utilities.getUuid(), activity_id, ...item, ...stamp});
+    }
+    if (newItems.length) adds.agenda_items = newItems;
     // Reuse the existing atomic Sheets writer, including literal text cell encoding.
-    budgetBatch_(spreadsheetId, adds, []);
+    budgetBatch_(spreadsheetId, adds, updates, deletes);
     return ok(result);
   } finally {
     lock.releaseLock();

@@ -1,0 +1,6 @@
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body[data-print-activity="true"] { margin: 0; background: white; }
+  body[data-print-activity="true"] > :not([data-activity-print-root]) { display: none !important; }
+  [data-activity-print-root] [data-print-controls] { display: none !important; }
+}

@@ -2,6 +2,7 @@ import {useEffect, useId, useRef, useState} from 'react';
 import {CalendarRange, Plus, Trash2} from 'lucide-react';
 import {callProjectRpc} from '../../rpc.js';
 import {ParticipantsWorkspace} from './ParticipantsWorkspace.jsx';
+import {ActivityReportPreview} from './ActivityReportPreview.jsx';
 import layout from '../../Home.module.css';
 import styles from './ActivityWorkspace.module.css';
 
@@ -19,6 +20,8 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const [activity, setActivity] = useState({activity_kind: 'FGD', title: '', activity_date: '', location: ''});
   const [agenda, setAgenda] = useState([]);
   const [pending, setPending] = useState(false);
@@ -28,6 +31,8 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
   const attempt = useRef(null);
   const [uncertain, setUncertain] = useState(false);
   const createButton = useRef(null);
+  const editButton = useRef(null);
+  const reportButton = useRef(null);
   const formHeading = useRef(null);
   const detailHeading = useRef(null);
   const form = useRef(null);
@@ -69,8 +74,10 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
 
   function closeForm() {
     setCreating(false);
+    const wasEdit = Boolean(editing);
+    setEditing(null);
     setError('');
-    requestAnimationFrame(() => createButton.current?.focus());
+    requestAnimationFrame(() => (wasEdit ? editButton : createButton).current?.focus());
   }
 
   function updateSession(key, field, value) {
@@ -89,7 +96,7 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
           return;
         }
       }
-      attempt.current = {id: crypto.randomUUID(), payload: {activity: {...activity},
+      attempt.current = {id: crypto.randomUUID(), payload: {...(editing || {}), activity: {...activity},
         agenda: agenda.map(({key, ...row}) => row)}};
     }
     const controller = new AbortController();
@@ -104,16 +111,17 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
       attempt.current = null;
       setUncertain(false);
       setCreating(false);
+      setEditing(null);
       setActivity({activity_kind: 'FGD', title: '', activity_date: '', location: ''});
       setAgenda([]);
       setRevision(value => value + 1);
       setSelection({id: saved.activity_id});
-      setMessage('Kegiatan dan rundown tersimpan sebagai draf.');
+      setMessage(editing ? 'Perubahan kegiatan dan rundown tersimpan.' : 'Kegiatan dan rundown tersimpan sebagai draf.');
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure.code === 'UNAUTHENTICATED') expire();
       else {
-        setError(failure.message);
+        setError(failure.code === 'CONFLICT' ? failure.message + ' Batalkan penyuntingan lalu muat ulang sebelum membuka versi terbaru.' : failure.message);
         if (['VALIDATION_ERROR', 'FORBIDDEN', 'CONFLICT', 'NOT_FOUND'].includes(failure.code)) {
           attempt.current = null;
           setUncertain(false);
@@ -142,12 +150,13 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
         </label>
         {current.data.can_write && <button ref={createButton} className={layout.primary} type="button"
           disabled={creating} aria-expanded={creating} aria-controls={id + '-form'}
-          onClick={() => {setCreating(true); setError(''); setMessage('');}}><Plus size={16} aria-hidden="true" /> Tambah kegiatan</button>}
+          onClick={() => {setEditing(null); setActivity({activity_kind: 'FGD', title: '', activity_date: '', location: ''});
+            setAgenda([]); setCreating(true); setError(''); setMessage('');}}><Plus size={16} aria-hidden="true" /> Tambah kegiatan</button>}
       </div>
       {!matches.length ? <p role="status">{query ? 'Tidak ada kegiatan yang cocok.' : 'Belum ada kegiatan untuk proyek ini.'}</p> : <>
         <ul className={styles.list}>
           {matches.slice(currentPage * 8, currentPage * 8 + 8).map(row => <li key={row.activity_id}>
-            <button className={styles.activity} type="button" aria-expanded={selection?.id === row.activity_id}
+            <button className={styles.activity} type="button" disabled={creating} aria-expanded={selection?.id === row.activity_id}
               aria-controls={id + '-detail'} onClick={() => setSelection({id: row.activity_id})}>
               <strong>{row.title}</strong><span>{date(row.activity_date)} · {row.activity_kind}</span>
               <span>{row.location} · {status(row.status)}</span>
@@ -162,7 +171,7 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
       </>}
     </>}
     {creating && <form id={id + '-form'} ref={form} className={styles.form} onSubmit={save}>
-      <h4 ref={formHeading} tabIndex={-1}>Kegiatan baru</h4>
+      <h4 ref={formHeading} tabIndex={-1}>{editing ? 'Sunting kegiatan dan rundown' : 'Kegiatan baru'}</h4>
       <fieldset disabled={pending || uncertain}>
         <legend>Identitas kegiatan</legend>
         <div className={styles.fields}>
@@ -187,6 +196,8 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
             <label className={styles.field}>Pembicara sesi {index + 1} (opsional)<select value={row.speaker_person_id}
               onChange={event => updateSession(row.key, 'speaker_person_id', event.target.value)}>
               <option value="">Belum ditetapkan</option>
+              {row.speaker_person_id && !speakers.some(person => person.person_id === row.speaker_person_id) &&
+                <option value={row.speaker_person_id}>Pembicara sebelumnya</option>}
               {speakers.map(person => <option key={person.person_id} value={person.person_id}>{person.display_name}</option>)}
             </select></label>
           </div>
@@ -202,7 +213,7 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {uncertain && <p role="status">Hasil penyimpanan belum diketahui. Coba lagi dengan isian yang sama untuk memeriksa hasil tanpa membuat duplikat.</p>}
       <div className={styles.actions}>
-        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba simpan kembali' : 'Simpan draf kegiatan'}</button>
+        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba simpan kembali' : editing ? 'Simpan perubahan kegiatan' : 'Simpan draf kegiatan'}</button>
         <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={closeForm}>Batal</button>
       </div>
     </form>}
@@ -212,6 +223,20 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
       {currentDetail?.error && <><p className={styles.error} role="alert">{currentDetail.error}</p>
         <button className={layout.secondary} type="button" onClick={() => setSelection({id: selection.id})}>Coba muat rundown lagi</button></>}
       {currentDetail?.data && <>
+        <div className={styles.actions}>
+          {currentDetail.data.can_write && <button ref={editButton} className={layout.secondary} type="button" disabled={creating}
+            onClick={() => {
+              const data = currentDetail.data;
+              setEditing({activity_id: data.activity.activity_id, expected_row_version: data.activity.row_version,
+                expected_agenda_versions: Object.fromEntries(data.agenda.map(row => [row.agenda_item_id, row.row_version]))});
+              setActivity(Object.fromEntries(['title', 'activity_kind', 'activity_date', 'location'].map(field => [field, data.activity[field]])));
+              setAgenda(data.agenda.map(row => ({key: crypto.randomUUID(), agenda_item_id: row.agenda_item_id,
+                start_time: row.start_time, end_time: row.end_time, title: row.title, speaker_person_id: row.speaker_person_id})));
+              setCreating(true); setError(''); setMessage('');
+            }}>Sunting kegiatan</button>}
+          {currentDetail.data.reports_enabled && <button ref={reportButton} className={layout.secondary} type="button"
+            disabled={pending || uncertain} onClick={() => setReportOpen(true)}>Pratinjau dokumen kegiatan</button>}
+        </div>
         <p>{date(currentDetail.data.activity.activity_date)} · {currentDetail.data.activity.activity_kind} · {status(currentDetail.data.activity.status)}</p>
         <p>{currentDetail.data.activity.location}</p>
         {currentDetail.data.agenda.length ? <ol className={styles.rundown} aria-label="Rundown kegiatan">
@@ -224,5 +249,9 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
           endpoint={endpoint} token={token} expire={expire} projectId={project.project_id} activityId={currentDetail.data.activity.activity_id} />}
       </>}
     </section>}
+    {reportOpen && selection && <ActivityReportPreview key={selection.id} endpoint={endpoint} token={token} expire={expire}
+      projectId={project.project_id} activityId={selection.id} onClose={() => {
+        setReportOpen(false); requestAnimationFrame(() => reportButton.current?.focus());
+      }} />}
   </section>;
 }

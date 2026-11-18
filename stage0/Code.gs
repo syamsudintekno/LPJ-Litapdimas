@@ -96,7 +96,7 @@ function dispatch_(request, identify) {
       'people.search', 'people.preview_import', 'people.commit_import', 'budgets.list_versions',
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
-      'participants.commit_import', 'participants.save', 'distributions.save', 'stage0.write_probe', 'taxes.verify'];
+      'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview', 'stage0.write_probe', 'taxes.verify'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -146,6 +146,14 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action === 'reports.preview') {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
+        return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      }
+      if (!roleFor(request.project_id)) return failure('FORBIDDEN', 'Akun tidak memiliki akses pratinjau proyek ini.');
+      return activityReport_(spreadsheetId, request);
+    }
 
     if (request.action.startsWith('participants.') || request.action === 'distributions.save') {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {

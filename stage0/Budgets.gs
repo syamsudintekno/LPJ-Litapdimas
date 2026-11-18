@@ -169,22 +169,23 @@ function budgetRpc_(spreadsheetId, user, request) {
   }
 }
 
-function budgetBatch_(spreadsheetId, adds, updates) {
+function budgetBatch_(spreadsheetId, adds, updates, deletes = []) {
   const metadata = Sheets.Spreadsheets.get(spreadsheetId, {fields: 'sheets(properties(sheetId,title))'});
   const ids = Object.fromEntries(metadata.sheets.map(sheet => [sheet.properties.title, sheet.properties.sheetId]));
-  const changing = new Set(updates.map(([name]) => name));
+  const changing = new Set([...updates, ...deletes].map(([name]) => name));
   const tables = Object.fromEntries([...new Set([...Object.keys(adds), ...changing])].map(name => {
     if (ids[name] === undefined) throw new Error('Tab RAB belum disiapkan.');
     const {values = []} = Sheets.Spreadsheets.Values.get(spreadsheetId, name + (changing.has(name) ? '!A:Z' : '!A1:Z1'),
       {valueRenderOption: 'UNFORMATTED_VALUE'});
     return [name, {headers: values[0] ?? [], values, sheetId: ids[name]}];
   }));
-  const requests = Object.entries(adds).map(([name, entries]) => {
+  const appendRequests = Object.entries(adds).map(([name, entries]) => {
     const {headers, sheetId} = tables[name];
     if (entries.some(record => Object.keys(record).some(field => !headers.includes(field)))) throw new Error('Header RAB belum lengkap.');
     return {appendCells: {sheetId, fields: 'userEnteredValue',
       rows: entries.map(record => ({values: headers.map(field => projectCell_(record[field]))}))}};
   });
+  const requests = [];
   for (const [name, id, changes] of updates) {
     const {headers, values, sheetId} = tables[name];
     const rowIndex = values.findIndex((row, index) => index > 0 && row[0] === id);
@@ -195,5 +196,16 @@ function budgetBatch_(spreadsheetId, adds, updates) {
         rows: [{values: [projectCell_(value)]}]}});
     }
   }
+  const removing = deletes.map(([name, id]) => {
+    const {values, sheetId} = tables[name];
+    const index = values.findIndex((row, offset) => offset > 0 && row[0] === id);
+    if (index < 1) throw new Error('Target penghapusan sesi tidak ditemukan.');
+    return {sheetId, index};
+  }).sort((a, b) => a.sheetId - b.sheetId || b.index - a.index);
+  if (new Set(removing.map(row => row.sheetId + ':' + row.index)).size !== removing.length) throw new Error('Target penghapusan ganda.');
+  for (const {sheetId, index} of removing) requests.push({deleteDimension: {
+    range: {sheetId, dimension: 'ROWS', startIndex: index, endIndex: index + 1},
+  }});
+  requests.push(...appendRequests);
   Sheets.Spreadsheets.batchUpdate({requests}, spreadsheetId);
 }

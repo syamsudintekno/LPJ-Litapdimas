@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -77,8 +77,13 @@ function setup() {
       if (writes.fail) throw new Error('Batch ditolak.');
       const valueOf = ({userEnteredValue: value}) => value?.numberValue ?? value?.stringValue ?? value?.boolValue ?? '';
       const names = Object.keys(sheets);
-      for (const {appendCells, updateCells} of requests) {
+      for (const {appendCells, updateCells, deleteDimension} of requests) {
         if (appendCells) sheets[names[appendCells.sheetId]].push(...appendCells.rows.map(row => row.values.map(valueOf)));
+        else if (deleteDimension) {
+          const {sheetId, startIndex, endIndex, dimension} = deleteDimension.range;
+          assert.equal(dimension, 'ROWS');
+          sheets[names[sheetId]].splice(startIndex, endIndex - startIndex);
+        }
         else {
           const {sheetId, rowIndex, columnIndex} = updateCells.start;
           sheets[names[sheetId]][rowIndex][columnIndex] = valueOf(updateCells.rows[0].values[0]);
@@ -144,6 +149,94 @@ function setupParticipants() {
   };
   return {...env, rows, call, preview, enroll};
 }
+
+function setupActivityDocuments() {
+  const env = setupParticipants();
+  const {sheets, activityA, activityB, projectA, projectB, properties} = env;
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.activities = [['activity_id', 'project_id', 'activity_kind', 'title', 'activity_date', 'location', 'status', ...stamp],
+    [activityA, projectA, 'FGD', 'FGD Sintetis A', '2026-11-18', 'Ruang A', 'DRAFT', 1, '2026-11-18T00:00:00.000Z', '2026-11-18T00:00:00.000Z'],
+    [activityB, projectB, 'FGD', 'FGD Sintetis B', '2026-11-19', 'Ruang B', 'DRAFT', 1]];
+  sheets.agenda_items = [['agenda_item_id', 'activity_id', 'start_time', 'end_time', 'title', 'speaker_person_id', ...stamp],
+    ...[0, 1, 2].map(index => [randomUUID(), activityA, (9 + index).toString().padStart(2, '0') + ':00',
+      (10 + index).toString().padStart(2, '0') + ':00', 'Sesi ' + index, '', 1]),
+    [randomUUID(), activityB, '09:00', '10:00', 'Sesi proyek lain', '', 1]];
+  sheets.logbook_entries.push([randomUUID(), projectA, activityA, '2026-11-18', 'Uraian A', 'Hasil A', 1],
+    [randomUUID(), projectB, activityB, '2026-11-19', 'Uraian rahasia B', 'Hasil B', 1]);
+  const participantId = randomUUID();
+  sheets.activity_participants.push([participantId, activityA, sheets.people[1][0], 'ABSENT', 1],
+    [randomUUID(), activityB, sheets.people[2][0], 'PRESENT', 1]);
+  sheets.distributions.push([randomUUID(), participantId, '', 'TRANSPORT', 1, '2026-11-18T09:00:00.000Z', 1]);
+  properties.ACTIVITIES_ENABLED = 'true';
+  return env;
+}
+
+test('penyuntingan kegiatan menjaga ID, memeriksa versi seluruh rundown, dan mengganti sesi atomik', () => {
+  const {rpc, editor, owner, viewer, projectA, projectB, activityA, activityB, sheets, writes} = setupActivityDocuments();
+  const read = () => rpc(editor, 'activities.get', projectA, {payload: {activity_id: activityA}}).data;
+  const old = read();
+  assert.equal(old.can_write, true);
+  const payload = {activity_id: activityA, expected_row_version: 1,
+    expected_agenda_versions: Object.fromEntries(old.agenda.map(row => [row.agenda_item_id, row.row_version])),
+    activity: {activity_kind: 'FGD', title: 'Judul direvisi', activity_date: '2026-11-18', location: 'Ruang revisi'},
+    agenda: [{agenda_item_id: old.agenda[0].agenda_item_id, start_time: '09:00', end_time: '09:30', title: 'Sesi diperbaiki'},
+      {start_time: '09:30', end_time: '10:00', title: 'Sesi baru'}]};
+  const requestId = randomUUID();
+  const save = (data = payload, request_id = requestId, account = editor, project = projectA) =>
+    rpc(account, 'activities.save', project, {payload: data, request_id});
+  assert.equal(save({...payload, expected_agenda_versions: {}}).error.code, 'CONFLICT');
+  assert.equal(save({...payload, agenda: [{...payload.agenda[0], agenda_item_id: sheets.agenda_items[4][0]}]}).error.code, 'VALIDATION_ERROR');
+  assert.equal(save({...payload, activity_id: activityB}, requestId, owner).error.code, 'NOT_FOUND');
+  assert.equal(save({...payload, activity_id: activityB}, requestId, viewer, projectB).error.code, 'FORBIDDEN');
+  writes.fail = true;
+  assert.equal(save().error.code, 'TEMPORARY_FAILURE');
+  assert.equal(read().agenda.length, 3);
+  assert.equal(read().activity.row_version, 1);
+  writes.fail = false;
+  assert.deepEqual(save().data, {activity_id: activityA, status: 'DRAFT', row_version: 2});
+  assert.deepEqual(save().data, {activity_id: activityA, status: 'DRAFT', row_version: 2});
+  assert.equal(save(payload, randomUUID()).error.code, 'CONFLICT');
+  const after = read();
+  assert.equal(after.activity.title, 'Judul direvisi');
+  assert.equal(after.agenda.length, 2);
+  assert.equal(after.agenda[0].agenda_item_id, old.agenda[0].agenda_item_id);
+  assert.equal(after.agenda[0].row_version, 2);
+  assert.equal(sheets.agenda_items.filter(row => row[1] === activityB).length, 1);
+  assert.equal(sheets.logbook_entries[1][2], activityA);
+  assert.equal(sheets.activity_participants[1][1], activityA);
+  assert.equal(sheets.activities[1][8], '2026-11-18T00:00:00.000Z');
+  const clear = {...payload, expected_row_version: 2, agenda: [],
+    expected_agenda_versions: Object.fromEntries(after.agenda.map(row => [row.agenda_item_id, row.row_version]))};
+  assert.equal(save(clear, randomUUID()).data.row_version, 3);
+  assert.equal(read().agenda.length, 0);
+  assert.equal(sheets.agenda_items.length, 2);
+  assert.equal(sheets.audit_log.length, 3);
+  assert.equal(writes.locked, false);
+});
+
+test('paket pratinjau membaca rundown/logbook/hadir/distribusi dari satu kegiatan dan menolak akses silang', () => {
+  const {rpc, editor, viewer, projectA, projectB, activityA, activityB, properties, writes} = setupActivityDocuments();
+  const preview = (account = editor, project = projectA, activity = activityA) => rpc(account, 'reports.preview', project,
+    {payload: {activity_id: activity, document_kind: 'ACTIVITY_PACKAGE'}});
+  assert.equal(preview().error.code, 'TEMPORARY_FAILURE');
+  properties.ACTIVITY_REPORTS_ENABLED = 'true';
+  assert.equal(preview(viewer).error.code, 'FORBIDDEN');
+  assert.equal(preview(editor, projectA, activityB).error.code, 'NOT_FOUND');
+  const data = preview().data;
+  assert.equal(data.is_final, false);
+  assert.equal(data.template_version, 'activity-draft-v1');
+  assert.equal(data.activity.activity_id, activityA);
+  assert.equal(data.agenda.length, 3);
+  assert.deepEqual(data.logbook.map(row => row.description), ['Uraian A']);
+  assert.equal(data.participants[0].attendance_status, 'ABSENT');
+  assert.equal(data.distributions.find(row => row.distribution_kind === 'TRANSPORT').total_quantity, 1);
+  assert.equal(data.distributions.find(row => row.distribution_kind === 'SNACK').rows.length, 0);
+  assert.equal(preview(viewer, projectB, activityB).data.logbook[0].description, 'Uraian rahasia B');
+  writes.locked = true;
+  assert.equal(preview().error.code, 'TEMPORARY_FAILURE');
+  writes.locked = false;
+  assert.equal(writes.batches, 0);
+});
 
 test('impor peserta memerlukan pratinjau terikat pengguna/kegiatan dan menjaga deduplikasi per kegiatan', () => {
   const {call, preview, enroll, rows, owner, viewer, editor, projectA, projectB, activityB, sheets, properties, writes, cache} = setupParticipants();
