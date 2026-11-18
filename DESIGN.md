@@ -8,7 +8,11 @@ Prototipe awal HTML Service memakai panel uji dengan token warna dasar. Sistem v
 
 Gunakan React, komponen internal, **CSS Modules**, dan **Lucide React** untuk ikon. Gunakan **Inter** dengan fallback system-ui. Simpan token di `src/styles/tokens.css`, aturan global di `globals.css`, dan aturan cetak di `print.css`. Aturan komponen berada di file `*.module.css`. Hindari inline CSS dan penambahan UI kit atau paket ikon kedua. Gunakan atribut data atau kelas untuk variasi status dan ukuran.
 
-Halaman utama mengikuti pola tata letak dari [CoreUI Free React Admin Template](https://github.com/coreui/coreui-free-react-admin-template). Navigasi samping dapat dilipat, header menunjukkan konteks halaman, dan kartu ringkasan menampilkan data proyek yang dikembalikan dari server.
+### Referensi pengembangan frontend
+
+Gunakan [CoreUI Free React Admin Template](https://github.com/coreui/coreui-free-react-admin-template) sebagai referensi tata letak dashboard. Untuk konteks saat mengembangkan halaman baru, rujuk [panduan AI-assisted development](https://github.com/coreui/coreui-free-react-admin-template/blob/main/README.md#ai-friendly-development), [arsitektur template](https://github.com/coreui/coreui-free-react-admin-template/blob/main/ARCHITECTURE.md), dan [panduan pengembangan](https://github.com/coreui/coreui-free-react-admin-template/blob/main/DEVELOPMENT.md).
+
+Terapkan pola sidebar yang dapat dilipat, header yang menunjukkan konteks halaman, dan kartu ringkasan berbasis data server. Implementasikan pola tersebut dengan komponen internal React, CSS Modules, token LPJ, dan ikon Lucide React sesuai sistem visual di atas.
 
 | Token | Nilai | Penggunaan |
 | --- | --- | --- |
