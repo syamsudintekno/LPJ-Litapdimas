@@ -52,11 +52,11 @@ Setiap baris di bawah adalah satu tab logis. Kolom pertama adalah PK kecuali din
 | logbook_entries | logbook_entry_id, project_id, activity_id opsional, entry_date, description, result |
 | activity_participants | activity_participant_id, activity_id, person_id, attendance_status. Unik activity_id + person_id |
 | distributions | distribution_id, activity_participant_id, transaction_id opsional, distribution_kind, quantity, received_at. Unik activity_participant_id + distribution_kind |
-| transactions | transaction_id, project_id, budget_item_id, activity_id opsional, payment_date, expense_kind, description, status |
+| transactions | transaction_id, project_id, budget_item_id, activity_id opsional, payment_date, expense_kind, description, status, confirmed_by_user_id, confirmed_at |
 | payment_details | payment_detail_id, transaction_id, payee_id, receipt_amount, withheld_tax_amount, added_tax_amount, net_paid_amount |
 | receipts | receipt_id, payment_detail_id, project_id, receipt_no, issued_on, status. Unik project_id + receipt_no dan satu bukti aktif per payment_detail_id |
 | tax_rule_versions | tax_rule_version_id, rule_code, version_no, tax_kind, expense_kind, payee_kind, eligibility, base_kind, rate_bps, effective_from, effective_to, source_ref |
-| tax_assessments | tax_assessment_id, payment_detail_id, tax_rule_version_id opsional, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot |
+| tax_assessments | tax_assessment_id, payment_detail_id, tax_rule_version_id opsional, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot, verification_context_digest |
 | tax_remittances | tax_remittance_id, project_id, paid_at, amount, attachment_id opsional |
 | tax_remittance_allocations | tax_remittance_allocation_id, tax_remittance_id, tax_assessment_id, amount |
 | attachments | attachment_id, project_id, activity_id opsional, transaction_id opsional, attachment_kind, drive_file_id |
@@ -94,7 +94,7 @@ erDiagram
 Satu adapter UI mengirim objek ke controller `dispatch`. Controller menerima action yang terdaftar, menurunkan identitas dari sesi tepercaya, lalu mengecek peran dan cakupan proyek. Semua mutasi memakai `request_id`. Mutasi atas baris yang sudah ada menyertakan `expected_row_version` atau versi pada tiap baris untuk batch. Parameter tanggal dan waktu dikirim sebagai string.
 
 ```json
-{"api_version":1,"action":"transactions.confirm","request_id":"<uuid>","project_id":"<uuid>","payload":{"transaction_id":"<uuid>","expected_row_version":4}}
+{"api_version":1,"action":"transactions.confirm","request_id":"<uuid>","project_id":"<uuid>","payload":{"transaction_id":"<uuid>","expected_row_version":4,"preview_token":"<uuid>","evidence_reviewed":true}}
 ```
 
 ```json
@@ -121,6 +121,7 @@ Satu adapter UI mengirim objek ke controller `dispatch`. Controller menerima act
 | taxes.list_rules | tanpa project_id; semua versi aturan global | Pemilik saja, saat TAXES_ENABLED=true |
 | tax_remittances.save | paid_at, amount, allocation dan bukti | Pemilik. Alokasi tidak melebihi potongan terkait |
 | transactions.confirm / receipts.issue | transaction_id / payment_detail_id | Pemilik. Konfirmasi dan penerbitan mengembalikan versi atau nomor bukti |
+| transactions.preview_confirmation | transaction_id | Pemilik; ringkasan server, penghalang, bukti dan token konteks maksimal 10 menit |
 | stages.save / reports.preview / reports.finalize | konfigurasi / report_stage_id, document_kind / pilihan paket dan versi sumber | Pemilik menetapkan tahap dan finalisasi. Pratinjau tersedia bagi anggota yang punya akses |
 | attachments.link / attachments.get | konteks dan file Drive yang sudah diotorisasi / attachment_id | Hak akses mengikuti proyek dan berkas |
 | attachments.list | transaction_id dalam proyek envelope | Pemilik/editor; metadata bukti, tautan folder khusus pemilik; tanpa mengubah izin Drive |
@@ -154,7 +155,7 @@ Pratinjau draf memakai `reports.preview` dengan `document_kind=ACTIVITY_PACKAGE`
 
 Irisan awal transaksi (LPJ-05, fondasi LPJ-06/07/09) mengaktifkan `transactions.list` dan `transactions.save` melalui `TRANSACTIONS_ENABLED`; `projects.get` menyertakan `transactions_enabled` untuk UI. Save menerima `payload.transaction` (`budget_item_id`, `activity_id` opsional/kosong, `payment_date`, `expense_kind`, `description`) dan `payments` sebanyak 1–30 penerima berbeda. Jenis belanja adalah `HONOR / TRANSPORT / CONSUMPTION / SNACK / OTHER`; uang saku yang merupakan transport memakai `TRANSPORT` dan tidak membuat pos kedua. Penerima merujuk tab `payees` dengan jenis `PERSON / ORGANIZATION / GROUP`.
 
-Tiap pembayaran mengirim `payee_id`, `receipt_amount` positif dan `withheld_tax_amount` nonnegatif dalam rupiah integer aman. Usulan potongan tidak boleh melebihi nilai kwitansi. Server menghitung `net_paid_amount = receipt_amount - withheld_tax_amount`, mengabaikan netto kiriman klien, dan memeriksa batas integer setiap total. Irisan ini hanya menerima `added_tax_amount` kosong/0; pajak tambahan memerlukan alur rekonsiliasi tagihan berikutnya. Status kiriman klien tidak digunakan: semua save menghasilkan `DRAFT`. Potongan masih berupa usulan, belum menjadi penetapan pajak atau persetujuan pemilik. Usulan berdasarkan aturan dan verifikasi potongan tersedia lewat alur pajak di bawah. Unggah langsung dari aplikasi, konfirmasi transaksi, kwitansi bernomor, dan rekap tahap masih menyusul.
+Tiap pembayaran mengirim `payee_id`, `receipt_amount` positif dan `withheld_tax_amount` nonnegatif dalam rupiah integer aman. Usulan potongan tidak boleh melebihi nilai kwitansi. Server menghitung `net_paid_amount = receipt_amount - withheld_tax_amount`, mengabaikan netto kiriman klien, dan memeriksa batas integer setiap total. Irisan ini hanya menerima `added_tax_amount` kosong/0; pajak tambahan memerlukan alur rekonsiliasi tagihan berikutnya. Status kiriman klien tidak digunakan: semua save menghasilkan `DRAFT`. Potongan masih berupa usulan, belum menjadi penetapan pajak atau persetujuan pemilik. Usulan berdasarkan aturan dan verifikasi potongan tersedia lewat alur pajak di bawah. Unggah langsung dari aplikasi, kwitansi bernomor, dan rekap tahap masih menyusul.
 
 Transaksi baru harus merujuk item pada RAB `APPROVED` aktif di proyek envelope. Saat revisi RAB menjadi aktif, draf lama boleh mempertahankan item lamanya pada versi `APPROVED/SUPERSEDED`; transaksi baru atau penggantian item harus memakai versi aktif. ID item tidak dipindah otomatis. Kegiatan harus berasal dari proyek yang sama. Pemilik dapat memilih penerima master yang valid. Anggota hanya dapat memilih payee personel proyek/peserta kegiatan proyek atau payee yang sudah digunakan pada transaksi proyek itu. Respons pilihan hanya memuat ID, jenis dan nama penerima; `tax_profile_ref` tidak dikirim ke browser. Pengelolaan master payee masih melalui konfigurasi spreadsheet sintetis, belum formulir aplikasi.
 
@@ -162,7 +163,17 @@ Penyuntingan mengirim `transaction_id`, `expected_row_version`, serta `expected_
 
 `transactions.list` mengembalikan transaksi beserta `payments`, `totals`, label item dan versi RAB, kegiatan, serta `can_edit`. Respons juga berisi pilihan `budget_items` (aktif atau dirujuk transaksi proyek), `activities`, `payees`, `can_write`, `can_create`, `draft_total_amount`, dan `confirmed_total_amount`. Total terkonfirmasi hanya menjumlahkan nilai kwitansi transaksi berstatus `CONFIRMED`, bukan netto; total draf ditampilkan terpisah. Pembayaran tersimpan yang netto/nilai rupiahnya tidak konsisten menyebabkan kegagalan pembacaan, bukan koreksi diam-diam. UI menyediakan tambah/sunting draf, penerima dinamis, pencarian, delapan transaksi per halaman, dan retry dengan payload/UUID yang sama saat hasil simpan belum diketahui.
 
-### Bukti transaksi di Drive
+### Konfirmasi transaksi
+
+`transactions.preview_confirmation` dan `transactions.confirm` hanya untuk pemilik, dengan `TRANSACTIONS_ENABLED=true` dan `TAXES_ENABLED=true`. Preview menerima `transaction_id` dalam proyek envelope, lalu mengembalikan transaksi, total integer dari server, seluruh pembayaran beserta status/tinjauan ulang/bukti, `blockers`, `can_confirm`, dan token bila syarat lengkap. Proyek harus aktif dengan plafon/versi valid, transaksi draf, item merujuk RAB proyek yang pernah disahkan (`APPROVED` atau `SUPERSEDED` dengan metadata pengesahan), serta kegiatan opsional berada dalam proyek. Irisan ini menolak hubungan kwitansi, alokasi setoran, atau distribusi yang sudah ada; rekonsiliasinya menyusul.
+
+Setiap pembayaran harus memiliki tepat satu penilaian `VERIFIED` atau `NOT_APPLICABLE` yang konsisten dengan potongan/netto, jenis perlakuan, dasar pajak, identitas/waktu pemilik, referensi dan alasan keputusan manual. Server memeriksa ulang kandidat aturan, snapshot aturan, serta PDF/JPG/PNG privat pada folder proyek yang cocok dengan versi/ID/waktu bukti saat diverifikasi. Semua penerima diperiksa; sebagian pembayaran yang lolos belum cukup. Sumber Sheet dibaca sekali per tabel pada konteks konfirmasi, dan metadata berkas yang dipakai beberapa pembayaran dibaca sekali per berkas.
+
+`verification_context_digest` pada assessment mengikat identitas/rincian transaksi, nominal dasar pembayaran, penerima/profil/golongan, dan kandidat aturan yang relevan. Digest tidak memasukkan versi induk atau potongan/netto hasil verifikasi, sehingga verifikasi penerima berikutnya tidak membatalkan penilaian penerima sebelumnya. Preview pajak dan konfirmasi menandai digest lama/kosong atau berubah untuk ditinjau ulang. Penilaian lama tanpa digest harus diverifikasi kembali; status/nominalnya tidak diubah otomatis. Snapshot aturan juga dibandingkan dengan versi yang tersimpan saat ini agar koreksi langsung Sheet pada ID aturan sama tidak lolos.
+
+Confirm menerima `transaction_id`, `preview_token`, `expected_row_version`, dan `evidence_reviewed=true`. Token terikat pemilik, proyek dan konteks lengkap; data atau bukti yang berubah, token kedaluwarsa, maupun syarat kurang menghasilkan `CONFLICT`. Di bawah lock, server memeriksa ulang sumber, menulis status `CONFIRMED`, versi baru, `confirmed_by_user_id`, `confirmed_at`, audit ringkas nominal/versi penilaian/versi bukti/waktu berkas serta jurnal dalam satu batch. Audit tidak menyalin referensi bebas panjang untuk semua penerima ke satu sel. Retry UUID/payload sama mengembalikan hasil semula. Total daftar menghitung setiap transaksi terkonfirmasi sekali; konfirmasi belum menerbitkan nomor kwitansi atau paket final. Transaksi yang terkonfirmasi tidak bisa disunting, diganti buktinya, atau dikoreksi pajaknya melalui alur draf.
+
+### Penautan bukti
 
 `ATTACHMENTS_ENABLED=true` mengaktifkan `attachments.list`, `attachments.get`, dan `attachments.link` untuk pemilik/editor dalam proyek yang diizinkan. Viewer ditolak. `transactions.list.can_manage_attachments` menentukan penampilan panel bukti. Berkas diunggah melalui Drive; aplikasi menautkan berkas yang sudah ada tanpa menyalin isi atau mengubah izin Drive. Metadata tidak disimpan di repo publik. Tautan folder hanya dikirim kepada pemilik; editor menautkan ID yang disiapkan pemilik dan tidak otomatis mendapat akses langsung folder.
 
@@ -192,7 +203,7 @@ Respons preview memuat `payment`, `transaction`, nama penerima, `proposal` (alas
 
 Irisan ini mendukung satu penilaian potongan per pembayaran. Jika sudah ada beberapa penilaian, kwitansi, alokasi setoran, distribusi tertaut transaksi, status transaksi bukan draf, atau proyek diarsipkan, verifikasi ditolak melalui alur ini. Verifikasi memperbarui atau menambah penilaian, menyimpan salinan aturan `rule_snapshot`, identitas/waktu pemilik, referensi/alasan, versi attachment dan metadata berkas yang diperiksa, lalu menghitung ulang potongan/netto pembayaran. Versi pembayaran dan transaksi naik, tetapi status transaksi tetap `DRAFT`. Penilaian, pembayaran, transaksi, audit sebelum/sesudah, dan jurnal idempotensi ditulis atomik di bawah lock. Retry selesai memakai UUID/payload yang sama tetap mengembalikan hasil semula. Bukti yang berubah setelah keputusan ditandai untuk tinjauan ulang saat pratinjau pemilik; metadata ini belum menjadi salinan bukti atau snapshot arsip final.
 
-Pengunggahan langsung dari aplikasi, verifikasi beberapa jenis pajak sekaligus, pajak tambahan, konfirmasi transaksi, penerbitan kwitansi, dan setoran tetap menyusul. Konfirmasi/finalisasi nantinya harus memeriksa ulang penilaian dan bukti terkini, bukan hanya menerima status `VERIFIED` yang tersimpan.
+Pengunggahan langsung dari aplikasi, verifikasi beberapa jenis pajak sekaligus, pajak tambahan, penerbitan kwitansi, dan setoran tetap menyusul. Konfirmasi memeriksa ulang penilaian dan bukti terkini; finalisasi nantinya juga harus melakukannya, bukan hanya menerima status `VERIFIED` yang tersimpan.
 
 ## Integritas dan operasi
 

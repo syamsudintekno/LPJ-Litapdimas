@@ -1,5 +1,5 @@
 .evidence, .panel, .files, .files li { display: grid; min-width: 0; gap: 12px; }
-.panel { padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.panel { padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; overflow-wrap: anywhere; }
 .panel h5 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
 .panel > button { justify-self: start; }
 .panel a { color: var(--color-primary); overflow-wrap: anywhere; }

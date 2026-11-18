@@ -50,7 +50,7 @@ function transactionRpc_(spreadsheetId, user, request, role) {
     const project = rows_(spreadsheetId, 'projects', ['project_id', 'status', 'active_budget_version_id'])
       .find(row => row.project_id === project_id);
     if (!project) return fail('NOT_FOUND', 'Proyek tidak ditemukan.');
-    const allTransactions = rows_(spreadsheetId, 'transactions', TRANSACTION_FIELDS_);
+    const allTransactions = rows_(spreadsheetId, 'transactions', TRANSACTION_FIELDS_, ['confirmed_by_user_id', 'confirmed_at']);
     const allPayments = rows_(spreadsheetId, 'payment_details', PAYMENT_FIELDS_);
     if (new Set(allTransactions.map(row => row.transaction_id)).size !== allTransactions.length ||
         new Set(allPayments.map(row => row.payment_detail_id)).size !== allPayments.length) {
@@ -121,6 +121,7 @@ function transactionRpc_(spreadsheetId, user, request, role) {
         payees: choices.map(({payee_id, payee_kind, legal_name}) => ({payee_id, payee_kind, legal_name})),
         can_write: canWrite, can_create: canWrite && items.some(row => row.is_current), draft_total_amount: draftTotal, confirmed_total_amount: confirmedTotal,
         can_manage_attachments: PropertiesService.getScriptProperties().getProperty('ATTACHMENTS_ENABLED') === 'true' && role !== 'VIEWER',
+        can_confirm_transactions: role === 'OWNER' && PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true',
         can_preview_taxes: PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true' && role !== 'VIEWER'});
     }
     if (!canWrite) return fail('VALIDATION_ERROR', 'Transaksi hanya dapat disimpan pada proyek draf atau aktif.');

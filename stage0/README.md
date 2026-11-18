@@ -130,9 +130,9 @@ Tambahkan `Transactions.gs` dan perbarui `Code.gs`. Gunakan proyek/spreadsheet s
 | Tab | Header |
 | --- | --- |
 | `payees` | `payee_id, payee_kind, person_id, legal_name, tax_profile_ref, row_version, created_at, updated_at` |
-| `transactions` | `transaction_id, project_id, budget_item_id, activity_id, payment_date, expense_kind, description, status, row_version, created_at, updated_at` |
+| `transactions` | `transaction_id, project_id, budget_item_id, activity_id, payment_date, expense_kind, description, status, row_version, created_at, updated_at, confirmed_by_user_id, confirmed_at` |
 | `payment_details` | `payment_detail_id, transaction_id, payee_id, receipt_amount, withheld_tax_amount, added_tax_amount, net_paid_amount, row_version, created_at, updated_at` |
-| `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, row_version, created_at, updated_at` |
+| `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot, row_version, created_at, updated_at, verification_context_digest` |
 | `receipts` | `receipt_id, payment_detail_id, project_id, receipt_no, issued_on, status, row_version, created_at, updated_at` |
 
 Isi payee sintetis dengan UUID stabil, jenis `PERSON`, `ORGANIZATION`, atau `GROUP`, dan nama. Payee `PERSON` dapat merujuk `person_id` dari Master Personel. Pemilik melihat pilihan payee valid; anggota hanya melihat personel/peserta proyek dan payee yang sudah dipakai pada proyeknya. Profil pajak tidak ditampilkan ke browser. Pengelolaan payee melalui UI menyusul.
@@ -141,7 +141,7 @@ Sahkan satu RAB agar menjadi versi aktif. Set `TRANSACTIONS_ENABLED=true`, perba
 
 Uji retry setelah respons terputus: UUID/payload tetap sama dan tidak menambah transaksi atau pembayaran. Uji penyuntingan dua versi bersaing: versi lama ditolak tanpa menimpa perubahan terbaru. Rincian pembayaran juga diperiksa versinya; data yang sudah tertaut penilaian pajak, kwitansi atau distribusi tidak boleh disunting lewat alur ini. Setelah revisi RAB disahkan, draf lama tetap menunjuk item/versi sebelumnya; draf baru harus memilih versi aktif. Viewer hanya membaca dan ID lintas proyek ditolak.
 
-Potongan pada draf ini masih usulan sampai ditinjau melalui alur pajak di bawah. Pajak tambahan nonzero ditolak. Unggah langsung dari aplikasi, konfirmasi realisasi, penerbitan kwitansi, setoran dan rekap tahap menyusul. Pengujian browser dengan login/RPC sintetis lulus untuk tambah/sunting draf, retry dengan UUID/payload yang sama, pemulihan konflik versi induk/pembayaran, penambahan/penghapusan penerima, pencarian, akses viewer, dan tampilan 360 px tanpa gulir horizontal. Tampilan desktop/mobile diperiksa melalui screenshot. Belum ada pembaruan atau pengujian deployment Google untuk fitur ini.
+Potongan pada draf ini masih usulan sampai ditinjau melalui alur pajak di bawah. Pajak tambahan nonzero ditolak. Unggah langsung dari aplikasi, penerbitan kwitansi, setoran dan rekap tahap menyusul. Pengujian browser dengan login/RPC sintetis lulus untuk tambah/sunting draf, retry dengan UUID/payload yang sama, pemulihan konflik versi induk/pembayaran, penambahan/penghapusan penerima, pencarian, akses viewer, dan tampilan 360 px tanpa gulir horizontal. Tampilan desktop/mobile diperiksa melalui screenshot. Belum ada pembaruan atau pengujian deployment Google untuk fitur ini.
 
 ## Menyiapkan penilaian dan verifikasi pajak LPJ-06
 
@@ -168,7 +168,7 @@ Siapkan atau perluas header berikut. Pertahankan PK pada kolom pertama dan isi `
 | Tab | Header |
 | --- | --- |
 | `tax_rule_versions` | `tax_rule_version_id, rule_code, version_no, tax_kind, expense_kind, payee_kind, eligibility, base_kind, rate_bps, effective_from, effective_to, source_ref, row_version, created_at, updated_at` |
-| `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot, row_version, created_at, updated_at` |
+| `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot, row_version, created_at, updated_at, verification_context_digest` |
 | `attachments` | `attachment_id, project_id, activity_id, transaction_id, attachment_kind, drive_file_id, row_version, created_at, updated_at` |
 | `tax_remittance_allocations` | `tax_remittance_allocation_id, tax_remittance_id, tax_assessment_id, amount, row_version, created_at, updated_at` |
 
@@ -184,7 +184,17 @@ Set `TAXES_ENABLED=true`, perbarui web app dan build Pages. Pada pembayaran, pil
 
 Uji perubahan versi, profil, aturan, atau bukti setelah pratinjau: request harus mendapat `CONFLICT` dan isian tetap tersedia. Muat ulang penilaian untuk memakai konteks terbaru. Retry setelah respons terputus memakai UUID/payload yang sama. Verifikasi memperbarui potongan/netto dan versi pembayaran/transaksi secara atomik, tetapi transaksi tetap draf dan total terkonfirmasi tetap tidak berubah. Bukti yang diubah setelah keputusan memerlukan tinjauan ulang. Metadata/rujukan bukti yang disimpan belum berupa snapshot atau arsip file final.
 
-Panel probe Tahap 0 sekarang memakai `stage0.tax_probe`. `taxes.verify` adalah mutasi sungguhan dan tidak lagi mengembalikan sukses yang hanya berarti lolos uji hak. Perbarui juga panel `Index.html`/Pages Tahap 0 bila masih dipakai. Uji browser dengan login/RPC sintetis lulus untuk keputusan pemilik, editor yang hanya mempratinjau, pembatasan viewer, konflik/pemuatan ulang, pemilihan bukti, retry dengan UUID/payload yang sama, alasan koreksi, netto dari server, serta desktop dan 360 px tanpa gulir horizontal. Scope/Drive/Sheets dalam pengujian server masih disimulasikan. Konfirmasi transaksi, kwitansi bernomor, pajak tambahan, setoran, dan rekap tahap tetap menyusul. Pengujian deployment Google sungguhan masih tertunda.
+Panel probe Tahap 0 sekarang memakai `stage0.tax_probe`. `taxes.verify` adalah mutasi sungguhan dan tidak lagi mengembalikan sukses yang hanya berarti lolos uji hak. Perbarui juga panel `Index.html`/Pages Tahap 0 bila masih dipakai. Uji browser dengan login/RPC sintetis lulus untuk keputusan pemilik, editor yang hanya mempratinjau, pembatasan viewer, konflik/pemuatan ulang, pemilihan bukti, retry dengan UUID/payload yang sama, alasan koreksi, netto dari server, serta desktop dan 360 px tanpa gulir horizontal. Scope/Drive/Sheets dalam pengujian server masih disimulasikan. Kwitansi bernomor, pajak tambahan, setoran, dan rekap tahap tetap menyusul. Pengujian deployment Google sungguhan masih tertunda.
+
+## Menyiapkan konfirmasi transaksi LPJ-05/06/09
+
+Tambahkan `TransactionConfirmation.gs`, perbarui `Code.gs`, `Transactions.gs`, `Taxes.gs` dan `DeploymentSetup.gs`. Sebelum memublikasikan backend baru, tambahkan kolom **di ujung header**, tanpa menyisipkan di tengah data: `confirmed_by_user_id` dan `confirmed_at` pada `transactions`, serta `verification_context_digest` pada `tax_assessments`. Jangan mengisi digest untuk keputusan lama dengan nilai buatan; penilaian tersebut perlu ditinjau dan diverifikasi ulang melalui UI. Data dan nominal lama tetap tersimpan.
+
+Gunakan proyek sintetis aktif dengan plafon/versi valid dan transaksi yang mengacu ke RAB yang pernah disahkan. Aktifkan `TRANSACTIONS_ENABLED` dan `TAXES_ENABLED`, siapkan pemetaan folder bukti, lalu verifikasi semua pembayaran. Pilih **Tinjau konfirmasi**, baca ringkasan/daftar penghalang dari server, buka bukti, dan centang pernyataan pemeriksaan sebelum **Konfirmasi transaksi**. Nol potongan tetap membutuhkan keputusan pajak yang sesuai beserta referensi/alasan dan bukti. Konfirmasi tidak menerbitkan kwitansi bernomor atau paket final.
+
+Uji contoh Rp900.000 dengan potongan Rp45.000: netto Rp855.000, total draf turun Rp900.000 dan total terkonfirmasi naik Rp900.000 sekali. Coba dua permintaan berbeda dengan token sama dan retry UUID yang sama setelah respons terputus. Ubah file/attachment, profil, kandidat atau isi aturan, nominal, versi, status proyek, atau hubungan dokumen sesudah pratinjau; konfirmasi harus ditolak dan pemilik meninjau ulang. Uji beberapa penerima: satu penilaian yang belum lengkap menahan seluruh transaksi, dan verifikasi penerima berikutnya tidak membatalkan yang pertama. Gagal batch tidak boleh menyimpan status atau audit sebagian. Setelah terkonfirmasi, alur draf tidak dapat mengubah transaksi, bukti atau pajak.
+
+Uji lokal memakai Sheets/Drive sintetis. Pengujian keuangan dan matriks akses pada deployment Google sungguhan tetap perlu dilakukan dengan akun pemilik/editor/viewer; publikasi kode atau probe tanpa login tidak menutup penerimaan tersebut.
 
 ## Prototipe awal HTML Service
 

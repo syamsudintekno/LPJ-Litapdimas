@@ -152,7 +152,9 @@ const DEPLOYMENT_HEADERS_ = {
     "status",
     "row_version",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "confirmed_by_user_id",
+    "confirmed_at"
   ],
   "payment_details": [
     "payment_detail_id",
@@ -186,7 +188,8 @@ const DEPLOYMENT_HEADERS_ = {
     "rule_snapshot",
     "row_version",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "verification_context_digest"
   ],
   "receipts": [
     "receipt_id",

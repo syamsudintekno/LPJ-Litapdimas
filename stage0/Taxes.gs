@@ -1,6 +1,16 @@
 const TAX_RULE_FIELDS_ = ['tax_rule_version_id', 'rule_code', 'version_no', 'tax_kind', 'expense_kind', 'payee_kind', 'eligibility', 'base_kind', 'rate_bps', 'effective_from', 'effective_to', 'source_ref'];
 const TAX_ASSESSMENT_FIELDS_ = ['tax_assessment_id', 'payment_detail_id', 'tax_rule_version_id', 'tax_kind', 'tax_treatment', 'tax_base_amount', 'amount', 'status',
-  'verified_by_user_id', 'verified_at', 'override_reason', 'decision_source_ref', 'evidence_attachment_id', 'evidence_row_version', 'evidence_drive_file_id', 'evidence_modified_at', 'rule_snapshot', 'row_version'];
+  'verified_by_user_id', 'verified_at', 'override_reason', 'decision_source_ref', 'evidence_attachment_id', 'evidence_row_version', 'evidence_drive_file_id', 'evidence_modified_at', 'rule_snapshot', 'verification_context_digest', 'row_version'];
+
+function taxVerificationDigest_(context) {
+  const {project, transaction, payment, payee, person, candidates} = context;
+  return requestDigest_([project.project_id,
+    ['transaction_id', 'budget_item_id', 'activity_id', 'payment_date', 'expense_kind', 'description'].map(key => transaction[key] || ''),
+    ['payment_detail_id', 'payee_id', 'receipt_amount', 'added_tax_amount'].map(key => payment[key]),
+    ['payee_id', 'payee_kind', 'person_id', 'legal_name', 'tax_profile_ref'].map(key => payee[key] || ''),
+    ['person_id', 'person_kind', 'civil_service_grade'].map(key => person?.[key] || ''),
+    [...candidates].sort((a, b) => a.tax_rule_version_id.localeCompare(b.tax_rule_version_id)).map(rule => TAX_RULE_FIELDS_.map(key => rule[key]))]);
+}
 
 function taxAmount_(amount, rate) {
   if (!Number.isSafeInteger(amount) || amount < 0 || !Number.isSafeInteger(rate) || rate < 0 || rate > 10000) return null;
@@ -121,6 +131,7 @@ function taxRpc_(spreadsheetId, user, request, role) {
       const proof = old && context.attachments.find(row => row.attachment_id === old.evidence_attachment_id);
       const file = old && evidence.find(row => row.attachment_id === old.evidence_attachment_id);
       const stale = !old || !['VERIFIED', 'NOT_APPLICABLE'].includes(old.status) || old.amount !== payment.withheld_tax_amount ||
+        old.verification_context_digest !== taxVerificationDigest_(context) ||
         (old.tax_rule_version_id && !candidates.some(row => row.tax_rule_version_id === old.tax_rule_version_id)) ||
         !proof || proof.row_version !== old.evidence_row_version || proof.drive_file_id !== old.evidence_drive_file_id ||
         (role === 'OWNER' && (!file?.available || file.modified_at !== old.evidence_modified_at));
@@ -154,6 +165,7 @@ function taxRpc_(spreadsheetId, user, request, role) {
       tax_base_amount: payload.tax_base_amount, amount: payload.amount, status: payload.status, verified_by_user_id: user.user_id, verified_at: time,
       override_reason: payload.override_reason.trim(), decision_source_ref: payload.decision_source_ref.trim(),
       rule_snapshot: JSON.stringify(rule || null),
+      verification_context_digest: taxVerificationDigest_(context),
       evidence_attachment_id: proof.attachment_id, evidence_row_version: proof.row_version, evidence_drive_file_id: proof.drive_file_id,
       evidence_modified_at: proof.modified_at, row_version: old ? old.row_version + 1 : 1, updated_at: time};
     const paymentChanges = {withheld_tax_amount: value.amount, net_paid_amount: payment.receipt_amount - value.amount,

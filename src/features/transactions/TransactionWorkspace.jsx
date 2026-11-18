@@ -3,6 +3,7 @@ import {ChevronLeft, ChevronRight, Close, Pencil, Plus, ReceiptText, RefreshCw, 
 import {callProjectRpc} from '../../rpc.js';
 import {TaxReview} from '../taxes/TaxReview.jsx';
 import {TransactionEvidence} from './TransactionEvidence.jsx';
+import {TransactionConfirmation} from './TransactionConfirmation.jsx';
 import layout from '../../Home.module.css';
 import styles from './TransactionWorkspace.module.css';
 
@@ -125,6 +126,7 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
                 aria-label={'Sunting transaksi ' + row.description} onClick={event => open(row, event.currentTarget)}><Pencil size={16} /> Sunting</button>}
             </div>
             <p>{date(row.payment_date)} · {kinds[row.expense_kind]} · {status[row.status]}</p>
+            {row.status === 'CONFIRMED' && row.confirmed_at && <p className={styles.context}>Dikonfirmasi pemilik pada {new Intl.DateTimeFormat('id-ID', {dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta'}).format(new Date(row.confirmed_at))} WIB</p>}
             <p className={styles.context}>{row.budget_item_label || 'Item RAB tidak tersedia'} · RAB versi {row.budget_version_no || '—'}</p>
             <p className={styles.context}>{row.activity_title || 'Tanpa kegiatan terkait'}</p>
             <dl className={styles.summary}>
@@ -146,6 +148,11 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
                   }} />}
               </li>)}
             </ul>
+            {data.can_confirm_transactions && row.status === 'DRAFT' && <TransactionConfirmation endpoint={endpoint} token={token} expire={expire}
+              projectId={project.project_id} transactionId={row.transaction_id} disabled={Boolean(draft)} onConfirmed={() => {
+                setRevision(value => value + 1); setMessage('Transaksi terkonfirmasi. Nilai kwitansi dihitung satu kali pada total terkonfirmasi.');
+                requestAnimationFrame(() => heading.current?.focus());
+              }} />}
           </li>)}
         </ul>
         <div className={styles.actions} aria-label="Halaman transaksi">

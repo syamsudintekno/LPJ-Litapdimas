@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -232,7 +232,7 @@ function setupTaxes() {
   const rule = [randomUUID(), 'SYNTHETIC_HONOR', 1, 'SYNTHETIC_WITHHOLDING', 'HONOR', 'PERSON', JSON.stringify({civil_service_grades: ['III/a']}),
     'RECEIPT_AMOUNT', 500, '2026-01-01', '2026-12-31', 'Synthetic fixture, not a tax regulation', 1];
   sheets.tax_assessments = [['tax_assessment_id', 'payment_detail_id', 'tax_rule_version_id', 'tax_kind', 'tax_treatment', 'tax_base_amount', 'amount', 'status',
-    'verified_by_user_id', 'verified_at', 'override_reason', 'decision_source_ref', 'evidence_attachment_id', 'evidence_row_version', 'evidence_drive_file_id', 'evidence_modified_at', 'rule_snapshot', 'row_version', 'created_at', 'updated_at']];
+    'verified_by_user_id', 'verified_at', 'override_reason', 'decision_source_ref', 'evidence_attachment_id', 'evidence_row_version', 'evidence_drive_file_id', 'evidence_modified_at', 'rule_snapshot', 'row_version', 'created_at', 'updated_at', 'verification_context_digest']];
   const evidenceId = randomUUID(); const driveId = 'synthetic-private-proof-01';
   sheets.attachments = [['attachment_id', 'project_id', 'activity_id', 'transaction_id', 'attachment_kind', 'drive_file_id', 'row_version', 'created_at', 'updated_at'],
     [evidenceId, env.projectA, '', created.transaction_id, 'PAYMENT_PROOF', driveId, 1]];
@@ -373,6 +373,131 @@ test('penautan bukti ditolak setelah kwitansi/setoran/distribusi, pada arsip, da
   sheets.attachments.push([randomUUID(), projectB, '', randomUUID(), 'PAYMENT_PROOF', fileId, 1]);
   assert.equal(call('attachments.link', payload).error.code, 'CONFLICT');
   assert.equal(call('attachments.get', {attachment_id: evidenceId}, undefined, projectB).error.code, 'FORBIDDEN');
+});
+
+function setupConfirmation() {
+  const env = setupAttachments();
+  const {sheets} = env;
+  for (const [field, value] of [['official_ceiling_amount', 4000000], ['row_version', 1]]) {
+    if (!sheets.projects[0].includes(field)) {sheets.projects[0].push(field); sheets.projects.slice(1).forEach(row => row.push(value));}
+  }
+  sheets.transactions[0].push('confirmed_by_user_id', 'confirmed_at');
+  for (const row of sheets.budget_versions.slice(1)) {row[4] = sheets.users[1][0]; row[5] = '2026-11-18T00:00:00.000Z';}
+  sheets.tax_rule_versions.push(env.rule);
+  const previewConfirmation = (account = env.owner, project = env.projectA) => env.rpc(account, 'transactions.preview_confirmation', project, {payload: {transaction_id: env.created.transaction_id}});
+  const confirmationPayload = (data = previewConfirmation().data) => ({transaction_id: env.created.transaction_id, expected_row_version: data.transaction.row_version,
+    preview_token: data.preview_token, evidence_reviewed: true});
+  const confirm = (payload = confirmationPayload(), id = randomUUID(), account = env.owner, project = env.projectA) =>
+    env.rpc(account, 'transactions.confirm', project, {request_id: id, payload});
+  return {...env, previewConfirmation, confirmationPayload, confirm};
+}
+
+test('konfirmasi hanya oleh pemilik, atomik, dihitung sekali, dan retry mengembalikan hasil yang sama', () => {
+  const env = setupConfirmation();
+  const {previewConfirmation, confirm, confirmationPayload, verify, decision, editor, viewer, owner, projectB, sheets, writes, list} = env;
+  assert.equal(previewConfirmation(editor).error.code, 'FORBIDDEN');
+  assert.equal(previewConfirmation(viewer).error.code, 'FORBIDDEN');
+  assert.equal(previewConfirmation(owner, projectB).error.code, 'NOT_FOUND');
+  assert.equal(previewConfirmation().data.can_confirm, false);
+  assert.equal(verify(decision()).ok, true);
+  const preview = previewConfirmation();
+  assert.deepEqual(preview.data.blockers, []);
+  assert.equal(preview.data.can_confirm, true);
+  assert.equal(preview.data.payments[0].evidence.name, 'Bukti sintetis');
+  const payload = confirmationPayload(preview.data), id = randomUUID();
+  assert.equal(confirm(payload, id, editor).error.code, 'FORBIDDEN');
+  assert.equal(confirm({...payload, evidence_reviewed: false}).error.code, 'VALIDATION_ERROR');
+  writes.fail = true;
+  const before = JSON.stringify(sheets);
+  assert.equal(confirm(payload, id).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(JSON.stringify(sheets), before);
+  writes.fail = false;
+  const confirmed = confirm(payload, id);
+  assert.equal(confirmed.data.status, 'CONFIRMED');
+  assert.equal(confirmed.data.confirmed_by_user_id, sheets.users[1][0]);
+  assert.equal(confirmed.data.totals.receipt_amount, 900000);
+  assert.equal(confirmed.data.totals.net_paid_amount, 855000);
+  const batches = writes.batches;
+  assert.deepEqual(confirm(payload, id), confirmed);
+  assert.equal(writes.batches, batches);
+  assert.equal(confirm({...payload, expected_row_version: payload.expected_row_version + 1}, id).error.code, 'CONFLICT');
+  assert.equal(confirm(payload).error.code, 'CONFLICT');
+  assert.equal(list().data.draft_total_amount, 0);
+  assert.equal(list().data.confirmed_total_amount, 900000);
+  assert.equal(list().data.transactions[0].can_edit, false);
+  assert.equal(list().data.transactions[0].confirmed_at, confirmed.data.confirmed_at);
+});
+
+test('konfirmasi mendeteksi perubahan bukti, profil, aturan dan nominal meski ID atau versi induk tidak diganti', () => {
+  for (const change of [
+    env => {env.driveFiles.get(env.driveId).modified_at = '2026-11-18T02:00:00.000Z';},
+    env => {env.driveFiles.get(env.driveId).parents = ['different-folder'];},
+    env => {env.sheets.payees[1][env.sheets.payees[0].indexOf('tax_profile_ref')] = 'changed-profile';},
+    env => {env.sheets.tax_rule_versions[1][8] = 600;},
+    env => {env.sheets.payment_details[1][3] = 910000; env.sheets.payment_details[1][6] = 865000;},
+    env => {env.sheets.attachments[1][6]++;},
+  ]) {
+    const env = setupConfirmation();
+    assert.equal(env.verify(env.decision()).ok, true);
+    const payload = env.confirmationPayload();
+    change(env);
+    assert.equal(env.confirm(payload).error.code, 'CONFLICT');
+    assert.equal(env.previewConfirmation().data.can_confirm, false);
+    assert.equal(env.preview().data.needs_review, true);
+  }
+});
+
+test('konfirmasi memeriksa seluruh penerima dan tidak membatalkan verifikasi pertama ketika penerima berikutnya diverifikasi', () => {
+  const env = setupConfirmation();
+  const {sheets, rpc, owner, projectA, created, verify, decision, previewConfirmation, confirm, driveReads} = env;
+  const person = [...sheets.people[1]]; person[0] = randomUUID(); person[2] = 'Penerima Kedua Sintetis'; sheets.people.push(person);
+  const payee = [...sheets.payees[1]]; payee[0] = randomUUID(); payee[2] = person[0]; payee[3] = 'Penerima Kedua Sintetis'; sheets.payees.push(payee);
+  const secondId = randomUUID();
+  sheets.payment_details.push([secondId, created.transaction_id, payee[0], 100000, 5000, 0, 95000, 1]);
+  assert.equal(verify(decision()).ok, true);
+  assert.equal(previewConfirmation().data.can_confirm, false);
+  const second = rpc(owner, 'taxes.preview', projectA, {payload: {payment_detail_id: secondId}}).data;
+  assert.equal(verify({...decision(second), payment_detail_id: secondId}).ok, true);
+  driveReads.length = 0;
+  const preview = previewConfirmation().data;
+  assert.deepEqual(preview.blockers, []);
+  assert.equal(preview.payments.length, 2);
+  assert.equal(preview.totals.receipt_amount, 1000000);
+  assert.equal(preview.totals.net_paid_amount, 950000);
+  assert.equal(driveReads.length, 1);
+  assert.equal(confirm().data.status, 'CONFIRMED');
+});
+
+test('konfirmasi menerima keputusan nol beralasan dan RAB lama yang pernah disahkan, tetapi menahan penilaian tanpa digest', () => {
+  const env = setupConfirmation();
+  const payload = {...env.decision(), status: 'NOT_APPLICABLE', amount: 0, override_reason: 'Synthetic decision: not applicable after evidence review.'};
+  assert.equal(env.verify(payload).ok, true);
+  env.sheets.budget_versions[1][3] = 'SUPERSEDED';
+  assert.equal(env.previewConfirmation().data.can_confirm, true);
+  const digestColumn = env.sheets.tax_assessments[0].indexOf('verification_context_digest');
+  env.sheets.tax_assessments[1][digestColumn] = '';
+  assert.equal(env.previewConfirmation().data.can_confirm, false);
+  assert.equal(env.preview().data.needs_review, true);
+  assert.equal(env.verify({...env.decision(), status: 'NOT_APPLICABLE', amount: 0, override_reason: 'Synthetic re-review of legacy assessment.'}).ok, true);
+  assert.equal(env.previewConfirmation().data.can_confirm, true);
+  assert.equal(env.confirm().data.totals.net_paid_amount, 900000);
+});
+
+test('konfirmasi menolak token kedaluwarsa, proyek tidak aktif, RAB asing, serta dokumen/setoran/distribusi tertaut', () => {
+  for (const change of [
+    env => {env.cache.clear();},
+    env => {env.sheets.projects[1][env.sheets.projects[0].indexOf('status')] = 'DRAFT';},
+    env => {env.sheets.budget_categories[1][1] = env.versionB;},
+    env => {env.sheets.receipts.push([randomUUID(), env.payment.payment_detail_id, 'ACTIVE']);},
+    env => {env.sheets.tax_remittance_allocations.push([randomUUID(), randomUUID(), env.sheets.tax_assessments[1][0], 1]);},
+    env => {env.sheets.distributions.push([randomUUID(), '', env.created.transaction_id, 'TRANSPORT', 1]);},
+  ]) {
+    const env = setupConfirmation();
+    assert.equal(env.verify(env.decision()).ok, true);
+    const payload = env.confirmationPayload();
+    change(env);
+    assert.equal(env.confirm(payload).error.code, 'CONFLICT');
+  }
 });
 
 function setupRuleEditor() {

@@ -97,7 +97,8 @@ function dispatch_(request, identify) {
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
       'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
-      'transactions.list', 'transactions.save', 'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
+      'transactions.list', 'transactions.save', 'transactions.preview_confirmation', 'transactions.confirm',
+      'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
       'taxes.list_rules', 'taxes.save_rule_version', 'attachments.list', 'attachments.get', 'attachments.link'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
@@ -175,6 +176,10 @@ function dispatch_(request, identify) {
         return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
       }
       const role = roleFor(request.project_id);
+      if (['transactions.preview_confirmation', 'transactions.confirm'].includes(request.action)) {
+        if (role !== 'OWNER') return failure('FORBIDDEN', 'Hanya pemilik yang dapat mengonfirmasi transaksi.');
+        return transactionConfirmationRpc_(spreadsheetId, user, request);
+      }
       if (!role || (request.action === 'transactions.save' && role === 'VIEWER')) {
         return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan transaksi ini.');
       }
