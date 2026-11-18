@@ -1,6 +1,7 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {CalendarRange, Plus, Trash2} from 'lucide-react';
 import {callProjectRpc} from '../../rpc.js';
+import {ParticipantsWorkspace} from './ParticipantsWorkspace.jsx';
 import layout from '../../Home.module.css';
 import styles from './ActivityWorkspace.module.css';
 
@@ -219,6 +220,8 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
             <span>{item.speaker_display_name || 'Pembicara belum ditetapkan'}</span>
           </li>)}
         </ol> : <p>Belum ada sesi rundown.</p>}
+        {currentDetail.data.participants_enabled && <ParticipantsWorkspace key={currentDetail.data.activity.activity_id}
+          endpoint={endpoint} token={token} expire={expire} projectId={project.project_id} activityId={currentDetail.data.activity.activity_id} />}
       </>}
     </section>}
   </section>;

@@ -55,7 +55,8 @@ function activityRpc_(spreadsheetId, user, request, role) {
       const agenda = rows_(spreadsheetId, 'agenda_items', AGENDA_FIELDS_)
         .filter(row => row.activity_id === activity.activity_id).sort((a, b) => a.start_time.localeCompare(b.start_time));
       const people = agenda.some(item => item.speaker_person_id) ? rows_(spreadsheetId, 'people', ['person_id', 'display_name']) : [];
-      return ok({activity, agenda: agenda.map(item => ({...item,
+      return ok({activity, participants_enabled: PropertiesService.getScriptProperties().getProperty('PARTICIPANTS_ENABLED') === 'true',
+        agenda: agenda.map(item => ({...item,
         speaker_display_name: people.find(person => person.person_id === item.speaker_person_id)?.display_name || '',
       }))});
     }

@@ -69,7 +69,7 @@ Untuk menguji RPC langsung, gunakan `activities.save`, ID proyek draf/aktif, UUI
 
 Uji ulang UUID request yang sama: hasil dan jumlah baris harus tetap sama. Perubahan payload dengan UUID lama menghasilkan `CONFLICT`. Viewer dan anggota proyek lain ditolak saat membuat kegiatan. Tanggal tak sah, jam terbalik, sesi tumpang tindih, dan ID pembicara tak tersedia ditolak. Bila hasil simpan belum diketahui di UI, isian dikunci dan **Coba simpan kembali** memakai request yang sama.
 
-Pengujian lokal browser dengan login/RPC sintetis lulus untuk gagal muat dan muat ulang, pembuatan oleh editor, validasi waktu dan fokus, retry setelah respons terputus, pembacaan rundown, pencarian, pembatasan UI viewer, serta lebar 360 px tanpa gulir horizontal halaman. Tampilan desktop dan mobile juga diperiksa melalui screenshot. Uji Google sungguhan untuk irisan ini belum dijalankan; peserta, distribusi, penyuntingan kegiatan, dan dokumen menyusul.
+Pengujian lokal browser dengan login/RPC sintetis lulus untuk gagal muat dan muat ulang, pembuatan oleh editor, validasi waktu dan fokus, retry setelah respons terputus, pembacaan rundown, pencarian, pembatasan UI viewer, serta lebar 360 px tanpa gulir horizontal halaman. Tampilan desktop dan mobile juga diperiksa melalui screenshot. Uji Google sungguhan untuk irisan ini belum dijalankan; penyuntingan kegiatan dan dokumen menyusul.
 
 ## Menyiapkan uji logbook LPJ-04
 
@@ -85,6 +85,26 @@ Uji dua pengguna menyunting versi yang sama: penyimpanan kedua harus menghasilka
 
 Pengujian browser dengan login/RPC sintetis juga lulus untuk tambah dan sunting logbook, hubungan kegiatan opsional, retry setelah respons terputus, konflik versi tanpa kehilangan isian, pemuatan versi terbaru, pencarian, UI viewer, dan tata letak 360 px. Uji deployment Google sungguhan masih tertunda.
 
+## Menyiapkan uji peserta dan distribusi LPJ-04
+
+Tambahkan `Participants.gs`, perbarui `Code.gs` dan `Activities.gs`, lalu siapkan tab berikut bersama tab kegiatan, personel, penugasan proyek, audit, serta jurnal permintaan yang sudah ada. Helper batch tetap berada di `Budgets.gs`.
+
+| Tab | Header |
+| --- | --- |
+| `activity_participants` | `activity_participant_id, activity_id, person_id, attendance_status, row_version, created_at, updated_at` |
+| `distributions` | `distribution_id, activity_participant_id, transaction_id, distribution_kind, quantity, received_at, row_version, created_at, updated_at` |
+
+Set `PARTICIPANTS_ENABLED=true` pada deployment sintetis, perbarui versi web app dan build Pages. Buka detail kegiatan untuk melihat **Peserta dan distribusi**. Pilih personel proyek dan buat pratinjau, atau unggah CSV dengan contoh format berikut. `person_id` harus berasal dari Master Personel aktif. CSV tidak membuat personel baru; simpan data asli di luar repo publik.
+
+```csv
+person_id,attendance_status
+30000000-0000-4000-8000-000000000001,PRESENT
+```
+
+Periksa hasil valid/duplikat/koreksi lalu impor peserta valid. Status hadir menerima `UNRECORDED`, `PRESENT`, atau `ABSENT`; kolom kosong menjadi belum dicatat. Impor ulang orang yang sudah terdaftar tidak menimpa status hadir dan distribusinya. Pratinjau kedaluwarsa maksimal 10 menit dan harus dibuat ulang bila isi batch atau hasil pemeriksaan berubah. CSV maksimal 1.000 baris dan 5 MB.
+
+Uji peserta tidak hadir menerima transport, serta peserta hadir belum menerima snack. Catat distribusi per jenis dengan jumlah unit dan waktu WIB. Jumlah 0 menandakan belum diterima/koreksi dan mengosongkan waktu; nominal uang dicatat melalui alur transaksi yang menyusul. Uji simpan bersamaan dengan versi lama harus ditolak, retry request yang sama tidak menambah baris, viewer tidak dapat menyimpan, serta ID kegiatan/peserta lintas proyek ditolak. Uji browser dengan login/RPC sintetis lulus untuk pratinjau/commit CSV, retry dengan UUID/payload yang sama, perubahan hadir terpisah dari transport, konversi WIB ke UTC, pencarian, viewer baca saja, dan 360 px tanpa gulir horizontal halaman. Tampilan desktop/mobile diperiksa melalui screenshot. Penautan transaksi dan cetak daftar hadir/distribusi belum tersedia. Uji Google sungguhan untuk fitur ini masih tertunda.
+
 ## Prototipe awal HTML Service
 
 Langkah deployment di bawah berlaku untuk reproduksi prototipe awal. Gunakan proyek Apps Script tersendiri, ubah `webapp.access` di manifest menjadi `DOMAIN` dan gunakan scope Sheets baca saja untuk skenario tersebut.
@@ -95,7 +115,7 @@ HTML Service memanggil `dispatch` melalui `google.script.run`. Setiap RPC memaka
 
 ## Uji lokal
 
-Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 18 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, kegiatan/rundown, serta logbook; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
+Gunakan Node.js 24 dan `pnpm install --frozen-lockfile`, lalu jalankan `pnpm test` dan `pnpm build` dari akar repositori. Pada 18 November 2026, seluruh 21 pengujian dan build lulus secara lokal. Pengujian server menjalankan berkas `.gs` dengan layanan Google disimulasikan, memakai TSV yang sama dengan panduan deployment. Pengujian ini mencakup akses, proyek, impor personel, RAB, kegiatan/rundown, logbook, peserta/distribusi, serta pembacaan CSV peserta; hasilnya belum menggantikan uji deployment Google sungguhan. Workflow **Check LPJ contracts and build** menjalankan pemeriksaan yang sama pada push dan pull request.
 
 ## Deployment uji dengan akun Google Workspace
 

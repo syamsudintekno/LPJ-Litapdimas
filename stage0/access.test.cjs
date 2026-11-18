@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -108,7 +108,7 @@ function setup() {
     assert.equal(response.mimeType, 'application/json');
     return JSON.parse(response.content);
   }
-  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes};
+  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache};
 }
 
 function setupLogbook() {
@@ -127,6 +127,107 @@ function setupLogbook() {
   sheets.mutation_requests = [['request_id', 'user_id', 'action', 'payload_digest', 'result_ref', 'status', ...stamp]];
   return {...env, activityA, activityB};
 }
+
+function setupParticipants() {
+  const env = setupLogbook();
+  const {sheets, activityA, activityB, projectA, editor, rpc} = env;
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.activity_participants = [['activity_participant_id', 'activity_id', 'person_id', 'attendance_status', ...stamp]];
+  sheets.distributions = [['distribution_id', 'activity_participant_id', 'transaction_id', 'distribution_kind', 'quantity', 'received_at', ...stamp]];
+  const rows = [{source_row: 2, person_id: sheets.people[1][0], attendance_status: 'PRESENT'}];
+  const call = (action, payload = {}, account = editor, project = projectA, request_id = randomUUID()) =>
+    rpc(account, action, project, {request_id, payload: {activity_id: activityA, ...payload}});
+  const preview = () => call('participants.preview_import', {rows});
+  const enroll = () => {
+    const {import_token} = preview().data;
+    return call('participants.commit_import', {rows, import_token});
+  };
+  return {...env, rows, call, preview, enroll};
+}
+
+test('impor peserta memerlukan pratinjau terikat pengguna/kegiatan dan menjaga deduplikasi per kegiatan', () => {
+  const {call, preview, enroll, rows, owner, viewer, editor, projectA, projectB, activityB, sheets, properties, writes, cache} = setupParticipants();
+  assert.equal(preview().error.code, 'TEMPORARY_FAILURE');
+  properties.PARTICIPANTS_ENABLED = 'true';
+  assert.equal(call('participants.list', {}, viewer).error.code, 'FORBIDDEN');
+  assert.equal(call('participants.preview_import', {activity_id: activityB, rows}, viewer, projectB).error.code, 'FORBIDDEN');
+  assert.equal(call('participants.list', {activity_id: activityB}).error.code, 'NOT_FOUND');
+  assert.equal(call('participants.preview_import', {rows: [...rows, {...rows[0], source_row: 3}]}).data.summary.correction, 2);
+  const invalid = call('participants.preview_import', {rows: [{...rows[0], person_id: randomUUID()}]}).data;
+  assert.equal(invalid.summary.correction, 1);
+  const plan = preview().data;
+  const stalePlan = preview().data;
+  assert.equal(plan.results[0].display_name, sheets.people[1][2]);
+  const commitId = randomUUID();
+  const commit = (payload = {rows, import_token: plan.import_token}, account = editor) =>
+    call('participants.commit_import', payload, account, projectA, commitId);
+  assert.equal(commit(undefined, owner).error.code, 'CONFLICT');
+  assert.equal(commit({rows, import_token: plan.import_token, activity_id: activityB}).error.code, 'NOT_FOUND');
+  writes.fail = true;
+  assert.equal(commit().error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.activity_participants.length, 1);
+  assert.equal(sheets.audit_log.length, 1);
+  writes.fail = false;
+  assert.deepEqual(commit().data, {imported: 1, duplicate: 0, correction: 0});
+  assert.deepEqual(commit().data, {imported: 1, duplicate: 0, correction: 0});
+  assert.equal(writes.batches, 1);
+  assert.equal(call('participants.commit_import', {rows, import_token: stalePlan.import_token}).error.code, 'CONFLICT');
+  assert.equal(preview().data.summary.duplicate, 1);
+  assert.equal(enroll().error.code, 'VALIDATION_ERROR');
+  const second = call('participants.preview_import', {rows, activity_id: activityB}, owner, projectB).data;
+  assert.equal(second.summary.valid, 1);
+  assert.equal(call('participants.commit_import', {rows, import_token: second.import_token, activity_id: activityB}, owner, projectB).data.imported, 1);
+  const expired = call('participants.preview_import', {rows: [{...rows[0], person_id: sheets.people[2][0]}]}).data;
+  cache.clear();
+  assert.equal(call('participants.commit_import', {rows: [{...rows[0], person_id: sheets.people[2][0]}], import_token: expired.import_token}).error.code, 'CONFLICT');
+  assert.equal(call('participants.list').data.participants.length, 1);
+});
+
+test('kehadiran dan distribusi terpisah, memakai versi/audit/idempotensi serta menolak hubungan lintas kegiatan', () => {
+  const {call, enroll, rows, activityB, owner, viewer, projectB, sheets, properties, writes} = setupParticipants();
+  properties.PARTICIPANTS_ENABLED = 'true';
+  enroll();
+  const participant = call('participants.list').data.participants[0];
+  const attendance = {activity_participant_id: participant.activity_participant_id, expected_row_version: 1, attendance_status: 'ABSENT'};
+  assert.equal(call('participants.save', attendance).data.row_version, 2);
+  assert.equal(call('participants.save', attendance).error.code, 'CONFLICT');
+  const distribution = {activity_participant_id: participant.activity_participant_id, expected_row_version: 0,
+    distribution_kind: 'TRANSPORT', quantity: 1, received_at: '2026-11-18T09:00:00.000Z'};
+  const id = randomUUID();
+  const save = (payload = distribution, request_id = id) => call('distributions.save', payload, undefined, undefined, request_id);
+  assert.equal(call('distributions.save', {...distribution, activity_id: activityB}, viewer, projectB).error.code, 'FORBIDDEN');
+  assert.equal(call('distributions.save', {...distribution, activity_id: activityB}, owner, projectB).error.code, 'NOT_FOUND');
+  for (const payload of [{...distribution, quantity: 1.5}, {...distribution, received_at: '2026-02-30T09:00:00.000Z'},
+    {...distribution, quantity: 0}, {...distribution, transaction_id: randomUUID()}]) {
+    assert.equal(save(payload).error.code, 'VALIDATION_ERROR');
+  }
+  writes.fail = true;
+  assert.equal(save().error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.distributions.length, 1);
+  writes.fail = false;
+  const result = save().data;
+  assert.deepEqual(save().data, result);
+  let current = call('participants.list').data.participants[0];
+  assert.equal(current.attendance_status, 'ABSENT');
+  assert.equal(current.distributions[0].quantity, 1);
+  assert.equal(current.row_version, 2);
+  assert.equal(save({...distribution, quantity: 2}, randomUUID()).error.code, 'CONFLICT');
+  assert.equal(save({...distribution, expected_row_version: 1, quantity: 0, received_at: ''}, randomUUID()).data.row_version, 2);
+  current = call('participants.list').data.participants[0];
+  assert.equal(current.attendance_status, 'ABSENT');
+  assert.equal(current.distributions[0].quantity, 0);
+  assert.equal(sheets.distributions.length, 2);
+  const duplicatedPlan = call('participants.preview_import', {rows: [{...rows[0], attendance_status: 'PRESENT'}]}).data;
+  assert.equal(duplicatedPlan.summary.duplicate, 1);
+  assert.equal(call('participants.list').data.participants[0].attendance_status, 'ABSENT');
+  sheets.distributions[1][2] = randomUUID();
+  assert.equal(save({...distribution, expected_row_version: 2}, randomUUID()).error.code, 'CONFLICT');
+  sheets.projects[1][4] = 'ARCHIVED';
+  assert.equal(call('participants.list').data.can_write, false);
+  assert.equal(call('participants.save', {...attendance, expected_row_version: 2}).error.code, 'VALIDATION_ERROR');
+  assert.deepEqual(save().data, result);
+  assert.equal(writes.locked, false);
+});
 
 test('logbook membuat dan menyunting entri dengan versi, audit, batch atomik, dan retry idempoten', () => {
   const {rpc, owner, editor, projectA, activityA, sheets, properties, writes} = setupLogbook();

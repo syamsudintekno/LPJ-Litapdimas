@@ -95,7 +95,8 @@ function dispatch_(request, identify) {
     const actions = ['projects.list', 'projects.get', 'projects.save', 'projects.activate',
       'people.search', 'people.preview_import', 'people.commit_import', 'budgets.list_versions',
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
-      'activities.save', 'logbook.list', 'logbook.save', 'stage0.write_probe', 'taxes.verify'];
+      'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
+      'participants.commit_import', 'participants.save', 'distributions.save', 'stage0.write_probe', 'taxes.verify'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -145,6 +146,17 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action.startsWith('participants.') || request.action === 'distributions.save') {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
+        return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      }
+      const role = roleFor(request.project_id);
+      if (!role || (request.action !== 'participants.list' && role === 'VIEWER')) {
+        return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan peserta ini.');
+      }
+      return participantsRpc_(spreadsheetId, user, request, role);
+    }
 
     if (request.action.startsWith('logbook.')) {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {

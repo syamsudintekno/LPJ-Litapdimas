@@ -1,0 +1,19 @@
+.workspace { display: grid; min-width: 0; gap: 16px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.workspace :is(h5, h6) { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.actions span { font-size: 14px; }
+.field { display: grid; min-width: 0; gap: 4px; font-size: 14px; font-weight: 600; }
+.field input, .field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font-size: 16px; font-weight: 400; }
+.field input[type="file"] { font-size: 14px; }
+.import, .preview, .retry, .list, .card { display: grid; min-width: 0; gap: 12px; }
+.list, .distributions { list-style: none; padding: 0; margin: 0; }
+.card { padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; overflow-wrap: anywhere; }
+.workspace fieldset { display: grid; min-width: 0; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.workspace legend { font-weight: 600; padding-inline: 4px; }
+.workspace fieldset p, .distributions { font-size: 14px; color: var(--color-muted); }
+.workspace fieldset button, .preview > button, .retry > button { justify-self: start; }
+.table { min-width: 0; overflow-x: auto; }
+.table table { min-width: 480px; width: 100%; border-collapse: collapse; font-size: 14px; }
+.table caption { text-align: start; font-weight: 600; padding-block: 8px; }
+.table th, .table td { padding: 8px; text-align: start; border-bottom: 1px solid var(--color-border); }
+.error { color: var(--color-danger); }

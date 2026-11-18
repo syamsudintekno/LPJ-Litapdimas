@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test stage0/access.test.cjs src/features/people/readPeopleImport.test.js"
+    "test": "node --test stage0/access.test.cjs src/features/people/readPeopleImport.test.js src/features/activities/readParticipantsCsv.test.js"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
