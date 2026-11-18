@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test stage0/access.test.cjs src/features/people/readPeopleImport.test.js src/features/activities/readParticipantsCsv.test.js"
+    "test": "node --test stage0/access.test.cjs stage0/DeploymentSetup.test.cjs src/features/people/readPeopleImport.test.js src/features/activities/readParticipantsCsv.test.js"
   },
   "dependencies": {
     "kubai-icons-react": "0.10.0",

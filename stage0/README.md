@@ -16,6 +16,16 @@ Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets 
 
 ## Menyiapkan uji wizard LPJ-01
 
+### Aktivasi fitur setelah struktur deployment siap
+
+Tambahkan `DeploymentSetup.gs` bersama seluruh berkas server terbaru. Helper ini tidak membuat atau mengubah data bisnis. Siapkan tab/header sesuai panduan di bawah terlebih dahulu, lalu buat folder privat `Bukti <project_id>` untuk setiap proyek uji langsung di folder induk spreadsheet. Jika `EVIDENCE_FOLDERS_JSON` sudah berisi pemetaan valid, helper mempertahankannya dan tidak mencari folder berdasarkan nama.
+
+Sebagai pemilik aktif yang tercatat di `users`, buka editor Apps Script, pilih fungsi **setupSyntheticFeatures**, lalu **Run**. Otorisasi scope aplikasi bila Google memintanya. Helper menolak identitas kosong/anggota/nonaktif, spreadsheet yang judulnya tidak memuat `Data Uji`, header yang kurang, serta folder yang publik atau ambigu. Semua pemeriksaan selesai sebelum menulis flag. Helper mengaktifkan sepuluh flag fitur yang sudah diimplementasikan dan menyimpan pemetaan folder pada Script Properties, tanpa menghapus properti lain atau mengubah status/nominal proyek lama. Fungsi dapat dijalankan kembali untuk memeriksa konfigurasi; ini bukan RPC aplikasi dan tidak dipanggil otomatis saat login.
+
+Log hasil sukses berisi `ok:true`, `enabled_features`, dan jumlah proyek. Setelah itu muat ulang GitHub Pages dan login sebagai pemilik. Fixture proyek lama yang belum mempunyai status, plafon, atau versi tetap belum siap untuk alur tulis; lengkapi melalui alur proyek yang sesuai atau buat proyek uji baru. Helper tidak mengarang data agar proyek lama tampak lengkap.
+
+### Wizard proyek
+
 Untuk uji penulisan gunakan deployment Apps Script dan spreadsheet privat khusus data sintetis. Tambahkan `Projects.gs` bersama `Code.gs`. Manifest saat ini meminta scope tulis Sheets. Untuk mereproduksi prototipe baca saja, gunakan scope `https://www.googleapis.com/auth/spreadsheets.readonly` dan biarkan `PROJECT_WRITES_ENABLED` kosong.
 
 Pertahankan data fixture, lalu lengkapi header berikut sebelum menjalankan wizard. Kolom pertama setiap tab tetap PK. Baris data lama boleh tetap kosong pada kolom baru.
