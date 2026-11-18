@@ -1,5 +1,5 @@
 import {useEffect, useId, useRef, useState} from 'react';
-import {BookOpen, Plus} from 'lucide-react';
+import {BookOpen, ChevronLeft, ChevronRight, Close, Pencil, Plus, RefreshCw, Save} from '../../components/ui/Icons.jsx';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
 import styles from './LogbookWorkspace.module.css';
@@ -94,7 +94,7 @@ export function LogbookWorkspace({endpoint, token, expire, project}) {
     <div className={styles.actions}>
       <h3 id={id + '-heading'} ref={heading} tabIndex={-1}><BookOpen size={18} aria-hidden="true" /> Logbook penelitian</h3>
       <button className={layout.secondary} type="button" disabled={pending}
-        onClick={() => setRevision(value => value + 1)}>Muat ulang logbook</button>
+        onClick={() => setRevision(value => value + 1)}><RefreshCw size={16} /> Muat ulang logbook</button>
     </div>
     <p className={styles.context}>{project.fiscal_year} · {project.title}</p>
     {!current && <p role="status">Memuat logbook…</p>}
@@ -114,16 +114,16 @@ export function LogbookWorkspace({endpoint, token, expire, project}) {
             <div className={styles.actions}><strong>{date(entry.entry_date)}</strong>
               {current.data.can_write && <button className={layout.secondary} type="button" disabled={Boolean(draft)}
                 aria-label={'Sunting logbook ' + date(entry.entry_date) + ' · ' + entry.description.slice(0, 60)}
-                onClick={event => open(entry, event.currentTarget)}>Sunting</button>}
+                onClick={event => open(entry, event.currentTarget)}><Pencil size={16} /> Sunting</button>}
             </div>
             <p className={styles.context}>{entry.activity_title || (entry.activity_id ? 'Kegiatan tidak tersedia' : 'Tanpa kegiatan terkait')}</p>
             <dl><dt>Uraian</dt><dd>{entry.description}</dd><dt>Hasil</dt><dd>{entry.result}</dd></dl>
           </li>)}
         </ol>
         <div className={styles.actions} aria-label="Halaman logbook">
-          <button className={layout.secondary} type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Sebelumnya</button>
+          <button className={layout.secondary} type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={16} /> Sebelumnya</button>
           <span role="status">Halaman {currentPage + 1} dari {Math.ceil(entries.length / 8)} · {entries.length} entri</span>
-          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= entries.length} onClick={() => setPage(currentPage + 1)}>Berikutnya</button>
+          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= entries.length} onClick={() => setPage(currentPage + 1)}><ChevronRight size={16} /> Berikutnya</button>
         </div>
       </>}
     </>}
@@ -148,8 +148,8 @@ export function LogbookWorkspace({endpoint, token, expire, project}) {
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {uncertain && <p role="status">Hasil simpan belum diketahui. Coba lagi dengan isian yang sama untuk memeriksa hasil tanpa menambah duplikat.</p>}
       <div className={styles.actions}>
-        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba simpan logbook kembali' : 'Simpan logbook'}</button>
-        <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={close}>Batal</button>
+        <button className={layout.primary} type="submit" disabled={pending}><Save size={16} /> {pending ? 'Menyimpan…' : uncertain ? 'Coba simpan logbook kembali' : 'Simpan logbook'}</button>
+        <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={close}><Close size={16} /> Batal</button>
       </div>
     </form>}
   </section>;

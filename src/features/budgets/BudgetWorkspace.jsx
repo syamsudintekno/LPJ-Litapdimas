@@ -1,3 +1,4 @@
+import {Check, Close, Plus, RefreshCw, Save, Trash2, Wallet} from '../../components/ui/Icons.jsx';
 import {useEffect, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
@@ -38,7 +39,7 @@ function BudgetForm({categories, setCategories, save, close, pending}) {
   }
 
   return <form className={styles.form} onSubmit={submit}>
-    <h4 ref={heading} tabIndex={-1}>Susun versi RAB baru</h4>
+    <h4 ref={heading} tabIndex={-1}><Wallet size={20} /> Susun versi RAB baru</h4>
     {categories.map((category, categoryIndex) => <fieldset key={category.key} disabled={pending}>
       <legend>Kategori {categoryIndex + 1}</legend>
       <div className={styles.fields}>
@@ -60,20 +61,20 @@ function BudgetForm({categories, setCategories, save, close, pending}) {
           </label>)}
         </div>
         {category.items.length > 1 && <button type="button" className={layout.secondary}
-          onClick={() => changeCategory(category.key, current => ({...current, items: current.items.filter(row => row.key !== item.key)}))}>Hapus item {itemIndex + 1}</button>}
+          onClick={() => changeCategory(category.key, current => ({...current, items: current.items.filter(row => row.key !== item.key)}))}><Trash2 size={16} /> Hapus item {itemIndex + 1}</button>}
       </fieldset>)}
       <div className={styles.actions}>
         <button type="button" className={layout.secondary} disabled={itemCount >= 200}
-          onClick={() => changeCategory(category.key, current => ({...current, items: [...current.items, emptyItem()]}))}>Tambah item</button>
+          onClick={() => changeCategory(category.key, current => ({...current, items: [...current.items, emptyItem()]}))}><Plus size={16} /> Tambah item</button>
         {categories.length > 1 && <button type="button" className={layout.secondary}
-          onClick={() => setCategories(current => current.filter(row => row.key !== category.key))}>Hapus kategori {categoryIndex + 1}</button>}
+          onClick={() => setCategories(current => current.filter(row => row.key !== category.key))}><Trash2 size={16} /> Hapus kategori {categoryIndex + 1}</button>}
       </div>
     </fieldset>)}
     <div className={styles.actions}>
       <button type="button" className={layout.secondary} disabled={pending || categories.length >= 30 || itemCount >= 200}
-        onClick={() => setCategories(current => [...current, emptyCategory()])}>Tambah kategori</button>
-      <button type="button" className={layout.secondary} disabled={pending} onClick={close}>Tutup editor</button>
-      <button type="submit" className={layout.primary} disabled={pending}>Simpan versi draf</button>
+        onClick={() => setCategories(current => [...current, emptyCategory()])}><Plus size={16} /> Tambah kategori</button>
+      <button type="button" className={layout.secondary} disabled={pending} onClick={close}><Close size={16} /> Tutup editor</button>
+      <button type="submit" className={layout.primary} disabled={pending}><Save size={16} /> Simpan versi draf</button>
     </div>
   </form>;
 }
@@ -141,9 +142,9 @@ export function BudgetWorkspace({endpoint, token, expire, projectId, role}) {
 
   return <section className={styles.budget} aria-labelledby="budget-heading">
     <div className={styles.actions}>
-      <h3 id="budget-heading">Rencana Anggaran Biaya</h3>
+      <h3 id="budget-heading"><Wallet size={20} /> Rencana Anggaran Biaya</h3>
       <button className={layout.secondary} type="button" disabled={!current || pending}
-        onClick={() => {setError(''); setConfirmedVersion(''); setSelection({id: selection.id});}}>Muat ulang RAB</button>
+        onClick={() => {setError(''); setConfirmedVersion(''); setSelection({id: selection.id});}}><RefreshCw size={16} /> Muat ulang RAB</button>
     </div>
     {!current && <p role="status">Memuat versi RAB…</p>}
     {current?.error && <p role="alert" className={styles.error}>{current.error}</p>}
@@ -186,17 +187,17 @@ export function BudgetWorkspace({endpoint, token, expire, projectId, role}) {
       {canEdit && !categories && <div className={styles.actions}>
         <button className={layout.primary} type="button" disabled={pending}
           onClick={() => {setError(''); setConfirmedVersion(''); setCategories(selected ? copyCategories(selected) : [emptyCategory()]);}}>
-          {selected ? 'Buat revisi dari versi ini' : 'Buat draf RAB'}
+          <Plus size={16} /> {selected ? 'Buat revisi dari versi ini' : 'Buat draf RAB'}
         </button>
         {role === 'OWNER' && selected?.status === 'DRAFT' && (confirmedVersion === selected.budget_version_id ? <>
           <span>{data.active_budget_version_id ? 'RAB aktif sebelumnya akan digantikan.' : 'Versi ini akan menjadi RAB aktif.'}</span>
           <button className={layout.primary} type="button" disabled={pending} onClick={() => submit('budgets.approve_version', {
             budget_version_id: selected.budget_version_id, expected_row_version: selected.row_version,
             expected_project_row_version: data.project_row_version,
-          })}>Konfirmasi pengesahan</button>
-          <button className={layout.secondary} type="button" disabled={pending} onClick={() => setConfirmedVersion('')}>Batal</button>
+          })}><Check size={16} /> Konfirmasi pengesahan</button>
+          <button className={layout.secondary} type="button" disabled={pending} onClick={() => setConfirmedVersion('')}><Close size={16} /> Batal</button>
         </> : <button className={layout.secondary} type="button" disabled={pending}
-          onClick={() => setConfirmedVersion(selected.budget_version_id)}>Sahkan versi ini</button>)}
+          onClick={() => setConfirmedVersion(selected.budget_version_id)}><Check size={16} /> Sahkan versi ini</button>)}
       </div>}
       {!data.can_write && role !== 'VIEWER' && <p>RAB dapat diusulkan untuk proyek draf atau aktif yang memiliki plafon resmi.</p>}
     </>}

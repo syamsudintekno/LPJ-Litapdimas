@@ -78,6 +78,10 @@
 .heading h1 { font-size: 24px; }
 .headingActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 40px;
   padding: 8px 12px;
   border: 0;

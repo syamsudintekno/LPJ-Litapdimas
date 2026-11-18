@@ -1,3 +1,4 @@
+import {ArrowRight, ChevronLeft, Close, FolderOpen, Plus, RefreshCw, Save, Trash2} from '../../components/ui/Icons.jsx';
 import {useEffect, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
@@ -108,7 +109,7 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
         }} />
       </label>
       {searchError ? <div role="alert">{searchError} <button type="button" className={layout.secondary}
-        onClick={() => {setSearchError(''); setSearchVersion(value => value + 1);}}>Coba lagi</button></div> :
+        onClick={() => {setSearchError(''); setSearchVersion(value => value + 1);}}><RefreshCw size={16} /> Coba lagi</button></div> :
         <p role="status">{!people ? 'Memuat pilihan personel…' : people.total > 50
           ? '50 hasil pertama. Persempit kata kunci untuk melihat hasil lain.'
           : people.total ? people.total + ' personel ditemukan.' : 'Tidak ada personel yang cocok.'}</p>}
@@ -130,11 +131,11 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
               </select>
             </label>
             {optionalRoles.includes(role) && <button type="button" className={layout.secondary}
-              onClick={() => setAssignments(items => items.filter(item => item.key !== row.key))}>Hapus {role}</button>}
+              onClick={() => setAssignments(items => items.filter(item => item.key !== row.key))}><Trash2 size={16} /> Hapus {role}</button>}
           </div>;
         })}
         {optionalRoles.includes(role) && <button type="button" className={layout.secondary} disabled={assignments.length >= 40}
-          onClick={() => setAssignments(items => [...items, {key: crypto.randomUUID(), assignment_role: role, person: null}])}>Tambah {role}</button>}
+          onClick={() => setAssignments(items => [...items, {key: crypto.randomUUID(), assignment_role: role, person: null}])}><Plus size={16} /> Tambah {role}</button>}
       </div>)}
     </>;
   }
@@ -148,8 +149,8 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
 
   return <section className={layout.panel} aria-labelledby="wizard-heading">
     <div className={layout.detailHeader}>
-      <h2 id="wizard-heading" tabIndex={-1} ref={heading}>Proyek baru · {steps[step]}</h2>
-      <button type="button" className={layout.secondary} disabled={saving || attemptPending} onClick={onClose}>Tutup</button>
+      <h2 id="wizard-heading" tabIndex={-1} ref={heading}><FolderOpen size={20} /> Proyek baru · {steps[step]}</h2>
+      <button type="button" className={layout.secondary} disabled={saving || attemptPending} onClick={onClose}><Close size={16} /> Tutup</button>
     </div>
     <ol className={styles.steps} aria-label="Langkah wizard">
       {steps.map((label, index) => <li key={label} aria-current={index === step ? 'step' : undefined}>{label}</li>)}
@@ -178,10 +179,10 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
             </label>)}
           </div>
           {stages.length > 1 && <button type="button" className={layout.secondary} onClick={() =>
-            setStages(items => items.filter(item => item.key !== stage.key))}>Hapus tahap {index + 1}</button>}
+            setStages(items => items.filter(item => item.key !== stage.key))}><Trash2 size={16} /> Hapus tahap {index + 1}</button>}
         </fieldset>)}
         <button type="button" className={layout.secondary} disabled={stages.length >= 10} onClick={() =>
-          setStages(items => [...items, {key: crypto.randomUUID(), label: '', target: '', cutoff_date: ''}])}>Tambah tahap</button>
+          setStages(items => [...items, {key: crypto.randomUUID(), label: '', target: '', cutoff_date: ''}])}><Plus size={16} /> Tambah tahap</button>
       </>}
       {step === 4 && <>
         <h3>{payload.project.title}</h3>
@@ -196,9 +197,9 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
       {attemptPending && !saving && <p role="status">Coba lagi untuk memastikan hasil penyimpanan sebelum mengubah draf.</p>}
       <div className={styles.actions}>
         {step > 0 && <button type="button" className={layout.secondary} disabled={saving || attemptPending}
-          onClick={() => {setSaveError(''); setStep(step - 1);}}>Kembali</button>}
+          onClick={() => {setSaveError(''); setStep(step - 1);}}><ChevronLeft size={16} /> Kembali</button>}
         <button type="submit" className={layout.primary} disabled={saving}>
-          {saving ? 'Menyimpan…' : step === 4 ? 'Simpan draf' : 'Lanjut'}
+          {step === 4 ? <Save size={16} /> : <ArrowRight size={16} />} {saving ? 'Menyimpan…' : step === 4 ? 'Simpan draf' : 'Lanjut'}
         </button>
       </div>
     </form>

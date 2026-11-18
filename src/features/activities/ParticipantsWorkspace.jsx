@@ -1,3 +1,4 @@
+import {ChevronLeft, ChevronRight, Eye, RefreshCw, Save, Upload, Users} from '../../components/ui/Icons.jsx';
 import {useEffect, useId, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import {readParticipantsCsv} from './readParticipantsCsv.js';
@@ -47,7 +48,7 @@ function ParticipantCard({person, canWrite, disabled, save}) {
             <select id={id + '-attendance'} value={attendance} onChange={event => setAttendance(event.target.value)}>
               {Object.entries(attendanceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></div>
-          <button className={layout.secondary} type="submit">Simpan kehadiran</button>
+          <button className={layout.secondary} type="submit"><Save size={16} /> Simpan kehadiran</button>
         </fieldset>
       </form>
       <form aria-label={'Penerimaan ' + person.display_name} onSubmit={event => {
@@ -68,7 +69,7 @@ function ParticipantCard({person, canWrite, disabled, save}) {
             <input id={id + '-received'} required={Number(quantity) > 0} type="datetime-local" step="60" value={received}
               onChange={event => setReceived(event.target.value)} /></div>
           <p>Jumlah 0 berarti belum diterima. Catatan ini terpisah dari status hadir dan nominal transaksi.</p>
-          <button className={layout.secondary} type="submit">Simpan distribusi</button>
+          <button className={layout.secondary} type="submit"><Save size={16} /> Simpan distribusi</button>
         </fieldset>
       </form>
     </>}
@@ -152,8 +153,8 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
 
   return <section className={styles.workspace} aria-labelledby={id + '-heading'}>
     <div className={styles.actions}>
-      <h5 id={id + '-heading'} ref={heading} tabIndex={-1}>Peserta dan distribusi</h5>
-      <button className={layout.secondary} type="button" disabled={disabled} onClick={() => {setRevision(value => value + 1); setPlan(null);}}>Muat ulang peserta</button>
+      <h5 id={id + '-heading'} ref={heading} tabIndex={-1}><Users size={20} /> Peserta dan distribusi</h5>
+      <button className={layout.secondary} type="button" disabled={disabled} onClick={() => {setRevision(value => value + 1); setPlan(null);}}><RefreshCw size={16} /> Muat ulang peserta</button>
     </div>
     {!current && <p role="status">Memuat peserta…</p>}
     {current?.error && <p className={styles.error} role="alert">{current.error}</p>}
@@ -161,7 +162,7 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
     {message && <p role="status">{message}</p>}
     {pending && <p role="status">Memproses peserta…</p>}
     {uncertain && <div className={styles.retry}><p>Hasil permintaan belum diketahui. Coba ulang dengan request yang sama untuk memeriksa hasil.</p>
-      <button className={layout.primary} type="button" disabled={pending} onClick={() => run()}>Coba permintaan peserta kembali</button></div>}
+      <button className={layout.primary} type="button" disabled={pending} onClick={() => run()}><RefreshCw size={16} /> Coba permintaan peserta kembali</button></div>}
     {current?.data && <>
       {current.data.can_write && <div className={styles.import}>
         <fieldset disabled={disabled}><legend>Tambah peserta dari personel proyek</legend>
@@ -171,7 +172,7 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
               {current.data.project_people.map(person => <option key={person.person_id} value={person.person_id}>{person.display_name}</option>)}
             </select></div>
           <button className={layout.secondary} type="button" disabled={!personId}
-            onClick={() => preview([{source_row: 1, person_id: personId, attendance_status: 'UNRECORDED'}])}>Pratinjau personel proyek</button>
+            onClick={() => preview([{source_row: 1, person_id: personId, attendance_status: 'UNRECORDED'}])}><Eye size={16} /> Pratinjau personel proyek</button>
         </fieldset>
         <fieldset disabled={disabled}><legend>Impor peserta dari CSV</legend>
           <p>Gunakan kolom person_id dari Master Personel. Kolom attendance_status opsional: UNRECORDED, PRESENT, atau ABSENT.</p>
@@ -187,7 +188,7 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
               finally {if (version === fileRead.current) setReading(false);}
             }} /></div>
           {reading && <p role="status">Membaca CSV…</p>}
-          <button className={layout.secondary} type="button" disabled={!rows} onClick={() => preview(rows)}>Pratinjau CSV peserta</button>
+          <button className={layout.secondary} type="button" disabled={!rows} onClick={() => preview(rows)}><Eye size={16} /> Pratinjau CSV peserta</button>
         </fieldset>
         {plan && <div className={styles.preview}>
           <p role="status">{plan.summary.valid} valid · {plan.summary.duplicate} duplikat · {plan.summary.correction} perlu koreksi</p>
@@ -200,7 +201,7 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
             run('participants.commit_import', {rows: plan.rows, import_token: plan.import_token}, data => {
               setPlan(null); setRows(null); setPersonId(''); setRevision(value => value + 1);
               setMessage(data.imported + ' peserta ditambahkan.'); heading.current?.focus();
-            })}>Impor peserta valid</button>
+            })}><Upload size={16} /> Impor peserta valid</button>
         </div>}
       </div>}
       <label className={styles.field}>Cari peserta<input type="search" maxLength={120} value={query}
@@ -212,9 +213,9 @@ export function ParticipantsWorkspace({endpoint, token, expire, projectId, activ
             person={person} disabled={disabled} canWrite={current.data.can_write} save={save} />)}
         </ul>
         <div className={styles.actions} aria-label="Halaman peserta">
-          <button className={layout.secondary} type="button" disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>Peserta sebelumnya</button>
+          <button className={layout.secondary} type="button" disabled={!currentPage} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={16} /> Peserta sebelumnya</button>
           <span role="status">Halaman {currentPage + 1} dari {Math.ceil(matches.length / 8)} · {matches.length} peserta</span>
-          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= matches.length} onClick={() => setPage(currentPage + 1)}>Peserta berikutnya</button>
+          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= matches.length} onClick={() => setPage(currentPage + 1)}><ChevronRight size={16} /> Peserta berikutnya</button>
         </div>
       </>}
     </>}

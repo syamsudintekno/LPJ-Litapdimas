@@ -1,3 +1,4 @@
+import {Close, RefreshCw, Save, ShieldCheck} from '../../components/ui/Icons.jsx';
 import {useEffect, useId, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
@@ -13,7 +14,7 @@ export function TaxReview({endpoint, token, expire, projectId, paymentId, disabl
   const button = useRef(null);
   return <div className={styles.review}>
     <button ref={button} className={layout.secondary} type="button" disabled={disabled || open} aria-expanded={open}
-      onClick={() => setOpen(true)}>Tinjau pajak</button>
+      onClick={() => setOpen(true)}><ShieldCheck size={16} /> Tinjau pajak</button>
     {open && <TaxReviewPanel endpoint={endpoint} token={token} expire={expire} projectId={projectId} paymentId={paymentId}
       onVerified={onVerified} onClose={() => {setOpen(false); requestAnimationFrame(() => button.current?.focus());}} />}
   </div>;
@@ -83,8 +84,8 @@ function TaxReviewPanel({endpoint, token, expire, projectId, paymentId, onVerifi
   const update = (field, value) => setDraft(previous => ({...previous, [field]: value}));
   return <section className={styles.panel} aria-labelledby={id + '-heading'}>
     <div className={fields.actions}>
-      <h5 id={id + '-heading'} ref={heading} tabIndex={-1}>Penilaian pajak pembayaran</h5>
-      <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={() => {setError(''); setRevision(value => value + 1);}}>Muat ulang penilaian</button>
+      <h5 id={id + '-heading'} ref={heading} tabIndex={-1}><ShieldCheck size={20} /> Penilaian pajak pembayaran</h5>
+      <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={() => {setError(''); setRevision(value => value + 1);}}><RefreshCw size={16} /> Muat ulang penilaian</button>
     </div>
     {!current && <p role="status">Memuat penilaian pajak…</p>}
     {current?.error && <p role="alert" className={fields.error}>{current.error}</p>}
@@ -137,9 +138,9 @@ function TaxReviewPanel({endpoint, token, expire, projectId, paymentId, onVerifi
         </fieldset>
         {error && <p role="alert" className={fields.error}>{error}</p>}
         {uncertain && <p role="status">Hasil simpan belum diketahui. Coba kembali dengan bukti, isian, dan request yang sama.</p>}
-        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba verifikasi kembali' : 'Simpan verifikasi pajak'}</button>
+        <button className={layout.primary} type="submit" disabled={pending}><Save size={16} /> {pending ? 'Menyimpan…' : uncertain ? 'Coba verifikasi kembali' : 'Simpan verifikasi pajak'}</button>
       </form> : <p>Keputusan hanya dapat disimpan pemilik untuk pembayaran draf yang belum tertaut kwitansi, setoran, atau distribusi. Penilaian beberapa jenis pajak sekaligus belum didukung.</p>}
     </>}
-    <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={onClose}>Tutup penilaian</button>
+    <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={onClose}><Close size={16} /> Tutup penilaian</button>
   </section>;
 }

@@ -1,3 +1,4 @@
+import {ChevronLeft, ChevronRight, Eye, Upload} from '../../components/ui/Icons.jsx';
 import {useEffect, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
@@ -57,7 +58,7 @@ export function PeopleImport({endpoint, token, expire, onCommitted}) {
   }
 
   return <section className={styles.importArea} aria-labelledby="import-heading">
-    <h3 id="import-heading">Impor personel</h3>
+    <h3 id="import-heading"><Upload size={20} /> Impor personel</h3>
     <form className={styles.importForm} onSubmit={event => {event.preventDefault(); run('preview');}}>
       <label>
         Berkas CSV atau XLSX
@@ -68,7 +69,7 @@ export function PeopleImport({endpoint, token, expire, onCommitted}) {
           setResult(null);
         }} />
       </label>
-      <button className={layout.secondary} disabled={pending || !file} type="submit">Pratinjau</button>
+      <button className={layout.secondary} disabled={pending || !file} type="submit"><Eye size={16} /> Pratinjau</button>
     </form>
     <p className={styles.help}>Untuk Excel, simpan kolom NIP, NIM, dan ID sebagai teks. Gunakan lembar pertama untuk data yang akan diimpor.</p>
     {pending && <p role="status">Memproses berkas…</p>}
@@ -88,12 +89,12 @@ export function PeopleImport({endpoint, token, expire, onCommitted}) {
         </table>
       </div>
       <div className={styles.importForm}>
-        <button className={layout.secondary} disabled={page === 0 || pending} type="button" onClick={() => setPage(page - 1)}>Sebelumnya</button>
+        <button className={layout.secondary} disabled={page === 0 || pending} type="button" onClick={() => setPage(page - 1)}><ChevronLeft size={16} /> Sebelumnya</button>
         <span>Halaman {page + 1} dari {Math.ceil(preview.results.length / pageSize)}</span>
         <button className={layout.secondary} disabled={(page + 1) * pageSize >= preview.results.length || pending}
-          type="button" onClick={() => setPage(page + 1)}>Berikutnya</button>
+          type="button" onClick={() => setPage(page + 1)}><ChevronRight size={16} /> Berikutnya</button>
         <button className={layout.primary} disabled={!preview.summary.valid || pending} type="button" onClick={() => run('commit')}>
-          Impor {preview.summary.valid} baris valid
+          <Upload size={16} /> Impor {preview.summary.valid} baris valid
         </button>
       </div>
     </>}

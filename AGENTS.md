@@ -4,7 +4,7 @@
 
 - [PRD](PRD.md) menetapkan cakupan, alur, dan kriteria penerimaan. Kaitkan perubahan dengan ID LPJ-01 hingga LPJ-09.
 - [Arsitektur](ARCHITECTURE.md) menetapkan nama tabel dan field, ERD, kontrak RPC, dan otorisasi.
-- [Panduan UI](DESIGN.md) menetapkan komponen, token, CSS Modules, Inter, dan Lucide React.
+- [Panduan UI](DESIGN.md) menetapkan komponen, token, CSS Modules, Inter, dan Kubai Icons React.
 - [Rencana implementasi](IMPLEMENTATION_PLAN.md) menetapkan urutan dan verifikasi. Bila rujukan bertentangan, jelaskan konflik dan usulkan perubahan dokumen terkait.
 
 ## Aturan implementasi

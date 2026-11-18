@@ -1,3 +1,4 @@
+import {Check} from '../../components/ui/Icons.jsx';
 import {useEffect, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import styles from '../../Home.module.css';
@@ -35,7 +36,7 @@ export function ProjectActivation({endpoint, token, expire, project, onActivated
 
   return <div className={styles.activation}>
     <button type="button" className={styles.primary} disabled={pending} onClick={activate}>
-      {pending ? 'Mengaktifkan…' : 'Aktifkan proyek'}
+      <Check size={16} /> {pending ? 'Mengaktifkan…' : 'Aktifkan proyek'}
     </button>
     {error && <p role="alert">{error}</p>}
   </div>;

@@ -6,3 +6,5 @@ button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .6; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 [hidden] { display: none !important; }
+
+:where(h2, h3, h4, h5):has(> [data-ui-icon]) { display: flex; align-items: center; gap: 8px; }

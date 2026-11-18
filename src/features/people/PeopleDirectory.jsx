@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {Search} from 'lucide-react';
+import {Search, Users} from '../../components/ui/Icons.jsx';
 import {callProjectRpc} from '../../rpc.js';
 import {PeopleImport} from './PeopleImport.jsx';
 import layout from '../../Home.module.css';
@@ -29,7 +29,7 @@ export function PeopleDirectory({endpoint, token, expire, canImport}) {
   }, [endpoint, token, expire, search]);
 
   return <section id="master-personel" tabIndex={-1} className={layout.panel} aria-labelledby="people-heading">
-    <div className={layout.panelHeading}><h2 id="people-heading">Master Personel</h2></div>
+    <div className={layout.panelHeading}><h2 id="people-heading"><Users size={20} /> Master Personel</h2></div>
     <form className={styles.searchForm} onSubmit={event => {
       event.preventDefault();
       setSearch({query: query.trim()});

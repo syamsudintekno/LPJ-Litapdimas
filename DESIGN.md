@@ -6,13 +6,24 @@ Rujukan cakupan dan istilah ada di [PRD.md](PRD.md). Nama field dan status tekni
 
 Prototipe awal HTML Service memakai panel uji dengan token warna dasar. Sistem visual berikut berlaku untuk UI aplikasi di GitHub Pages.
 
-Gunakan React, komponen internal, **CSS Modules**, dan **Lucide React** untuk ikon. Gunakan **Inter** dengan fallback system-ui. Simpan token di `src/styles/tokens.css`, aturan global di `globals.css`, dan aturan cetak di `print.css`. Aturan komponen berada di file `*.module.css`. Hindari inline CSS dan penambahan UI kit atau paket ikon kedua. Gunakan atribut data atau kelas untuk variasi status dan ukuran.
+Gunakan React, komponen internal, **CSS Modules**, dan **Kubai Icons React** untuk ikon. Gunakan **Inter** dengan fallback system-ui. Simpan token di `src/styles/tokens.css`, aturan global di `globals.css`, dan aturan cetak di `print.css`. Aturan komponen berada di file `*.module.css`. Hindari inline CSS dan penambahan UI kit atau paket ikon kedua. Gunakan atribut data atau kelas untuk variasi status dan ukuran.
+
+### Standar ikon Kubai
+
+Gunakan [Kubai Icons](https://github.com/kubai087/kubai-icons) melalui paket `kubai-icons-react` (versi terkunci di `package.json`, lisensi MIT untuk paket dan ikon). Kubai merupakan satu-satunya pustaka ikon UI; jangan menambahkan Lucide, icon font, atau CDN ikon lain.
+
+- Semua halaman aplikasi memakai ekspor semantik dari `src/components/ui/Icons.jsx`. Adapter memakai impor statis per ikon agar bundel hanya membawa ikon yang digunakan.
+- Gunakan varian `soft`, warna `currentColor`, ukuran 16–20 px pada tombol/navigasi, 20–24 px pada judul bagian, dan 28–32 px pada kartu ringkasan. Ukuran melalui prop `size`; tata letak melalui CSS Modules.
+- Terapkan ikon pada navigasi, ringkasan proyek, wizard/aktivasi, master/impor personel, RAB, kegiatan/rundown, peserta/distribusi, logbook, transaksi, penilaian pajak, dan toolbar pratinjau dokumen. Pilih makna yang konsisten: tambah, hapus, sunting, simpan, muat ulang, impor, pratinjau, dan cetak. Hindari pengulangan ikon di setiap sel tabel atau field.
+- Ikon pendamping bersifat dekoratif (`aria-hidden`, `focusable="false"`). Pertahankan label teks tombol dan status; tombol tanpa teks wajib punya nama aksesibel pada tombolnya. Ikon tidak menambah tab stop.
+- Adapter memakai `trigger="none"`: ikon statis tanpa animasi hover/tap atau status toggle internal. Ini juga mempertahankan tampilan tenang pada preferensi reduced motion dan cetak.
+- Logo resmi institusi tetap memakai aset resmi. Isi dokumen A4 dan kolom tanda tangan tidak diberi ikon dekoratif; ikon hanya berada pada toolbar yang disembunyikan saat cetak. Panel uji HTML Service bukan halaman UI aplikasi.
 
 ### Referensi pengembangan frontend
 
 Gunakan [CoreUI Free React Admin Template](https://github.com/coreui/coreui-free-react-admin-template) sebagai referensi tata letak dashboard. Untuk konteks saat mengembangkan halaman baru, rujuk [panduan AI-assisted development](https://github.com/coreui/coreui-free-react-admin-template/blob/main/README.md#ai-friendly-development), [arsitektur template](https://github.com/coreui/coreui-free-react-admin-template/blob/main/ARCHITECTURE.md), dan [panduan pengembangan](https://github.com/coreui/coreui-free-react-admin-template/blob/main/DEVELOPMENT.md).
 
-Terapkan pola sidebar yang dapat dilipat, header yang menunjukkan konteks halaman, dan kartu ringkasan berbasis data server. Implementasikan pola tersebut dengan komponen internal React, CSS Modules, token LPJ, dan ikon Lucide React sesuai sistem visual di atas.
+Terapkan pola sidebar yang dapat dilipat, header yang menunjukkan konteks halaman, dan kartu ringkasan berbasis data server. Implementasikan pola tersebut dengan komponen internal React, CSS Modules, token LPJ, dan ikon Kubai Icons React sesuai sistem visual di atas.
 
 | Token | Nilai | Penggunaan |
 | --- | --- | --- |
@@ -33,7 +44,7 @@ Skala jarak 4, 8, 12, 16, 24, 32, 48 px. Radius elemen 8 px, panel 12 px. Ukuran
 | Komponen | Aturan |
 | --- | --- |
 | AppShell | Pemilih proyek dan tahun selalu terlihat pada halaman yang membutuhkan konteks. Menu berdasarkan hak akses dan ruang lingkup PRD. Pada layar sempit gunakan navigasi lipat. |
-| Button dan IconButton | Satu aksi utama per formulir. Ikon Lucide 16–20 px. Tombol ikon punya nama aksesibel. Tampilkan progres simpan dan cegah kirim berulang. |
+| Button dan IconButton | Satu aksi utama per formulir. Ikon Kubai 16–20 px. Tombol ikon punya nama aksesibel. Tampilkan progres simpan dan cegah kirim berulang. |
 | FormField dan PersonPicker | Label terlihat, bantuan dekat field, dan pesan kesalahan spesifik. Tampilkan nama, kategori dan unit seperlunya untuk membedakan orang dengan nama sama. |
 | SetupWizard | Langkah Identitas → Tim → Pejabat → Tahap LPJ → Tinjau. Tombol kembali mempertahankan draf. Ringkasan menampilkan data yang harus dilengkapi sebelum aktivasi. |
 | DataTable | Header semantik, filter eksplisit dan navigasi halaman. Pada ponsel, tabel padat boleh bergulir horizontal dalam wrapper berlabel. Utamakan kolom identitas, status, dan nominal. |

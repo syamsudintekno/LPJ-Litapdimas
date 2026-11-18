@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, RefreshCw, Search, Users} from 'lucide-react';
+import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Trash2, Users} from './components/ui/Icons.jsx';
 import {callProjectRpc, loadConfig, loadGoogleSignIn} from './rpc.js';
 import {PeopleDirectory} from './features/people/PeopleDirectory.jsx';
 import {ProjectWizard} from './features/projects/ProjectWizard.jsx';
@@ -57,7 +57,7 @@ function AppShell({children, onSignOut, canManagePeople}) {
             <Menu size={18} aria-hidden="true" />
           </button>
           <span>Ruang kerja</span>
-          <ChevronRight size={14} aria-hidden="true" />
+          <ChevronRight size={16} aria-hidden="true" />
           <strong>Proyek</strong>
         </div>
         <button className={styles.secondary} type="button" onClick={onSignOut}>
@@ -134,7 +134,7 @@ function Workspace({endpoint, token, expire, onSignOut}) {
       </div>
       <div className={styles.headingActions}>
         {canCreateProject && <button ref={wizardButton} className={styles.primary} type="button"
-          aria-expanded={wizardOpen} disabled={wizardOpen} onClick={() => setWizardOpen(true)}>Buat proyek</button>}
+          aria-expanded={wizardOpen} disabled={wizardOpen} onClick={() => setWizardOpen(true)}><Plus size={16} /> Buat proyek</button>}
         <button className={styles.secondary} type="button" onClick={updateProjects} disabled={!list}>
           <RefreshCw size={16} aria-hidden="true" /> Muat ulang
         </button>
@@ -168,7 +168,7 @@ function Workspace({endpoint, token, expire, onSignOut}) {
     </dl>}
 
     <section id="daftar-proyek" tabIndex={-1} className={styles.panel} aria-labelledby="list-heading" aria-busy={!list}>
-      <div className={styles.panelHeading}><h2 id="list-heading">Daftar proyek</h2></div>
+      <div className={styles.panelHeading}><h2 id="list-heading"><FolderOpen size={20} /> Daftar proyek</h2></div>
       <div className={styles.toolbar}>
         <label>
           Cari proyek
@@ -216,7 +216,7 @@ function Workspace({endpoint, token, expire, onSignOut}) {
         <FolderOpen size={28} aria-hidden="true" />
         <strong>{projects.length ? 'Proyek tidak ditemukan' : 'Belum ada proyek'}</strong>
         <span>{projects.length ? 'Coba kata kunci atau tahun anggaran lain.' : 'Proyek yang dapat Anda akses akan muncul di sini.'}</span>
-        {projects.length > 0 && <button className={styles.secondary} type="button" onClick={() => {setQuery(''); setYear('');}}>Hapus filter</button>}
+        {projects.length > 0 && <button className={styles.secondary} type="button" onClick={() => {setQuery(''); setYear('');}}><Trash2 size={16} /> Hapus filter</button>}
       </div>)}
     </section>
 

@@ -1,3 +1,4 @@
+import {Close, FileText, Printer, RefreshCw} from '../../components/ui/Icons.jsx';
 import {useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {callProjectRpc} from '../../rpc.js';
@@ -52,11 +53,11 @@ export function ActivityReportPreview({endpoint, token, expire, projectId, activ
   return createPortal(<div data-activity-print-root>
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onCancel={event => {event.preventDefault(); onClose();}}>
       <div className={styles.toolbar} data-print-controls>
-        <h2 id={id}>Pratinjau dokumen kegiatan</h2>
+        <h2 id={id}><FileText size={20} /> Pratinjau dokumen kegiatan</h2>
         <div className={styles.actions}>
-          <button className={layout.secondary} type="button" onClick={() => setRevision(value => value + 1)}>Muat ulang dokumen</button>
-          <button className={layout.primary} type="button" disabled={!data} onClick={() => window.print()}>Cetak draf</button>
-          <button className={layout.secondary} type="button" onClick={onClose} autoFocus>Tutup pratinjau</button>
+          <button className={layout.secondary} type="button" onClick={() => setRevision(value => value + 1)}><RefreshCw size={16} /> Muat ulang dokumen</button>
+          <button className={layout.primary} type="button" disabled={!data} onClick={() => window.print()}><Printer size={16} /> Cetak draf</button>
+          <button className={layout.secondary} type="button" onClick={onClose} autoFocus><Close size={16} /> Tutup pratinjau</button>
         </div>
         <p>Data yang sudah tersimpan ditampilkan sebagai draf. Gunakan dialog cetak browser untuk mencetak atau menyimpan PDF.</p>
       </div>

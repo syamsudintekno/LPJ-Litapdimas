@@ -1,5 +1,5 @@
 import {useEffect, useId, useRef, useState} from 'react';
-import {CalendarRange, Plus, Trash2} from 'lucide-react';
+import {CalendarRange, ChevronLeft, ChevronRight, Close, Eye, Pencil, Plus, RefreshCw, Save, Trash2} from '../../components/ui/Icons.jsx';
 import {callProjectRpc} from '../../rpc.js';
 import {ParticipantsWorkspace} from './ParticipantsWorkspace.jsx';
 import {ActivityReportPreview} from './ActivityReportPreview.jsx';
@@ -136,7 +136,7 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
     <div className={styles.actions}>
       <h3 id={id + '-heading'}><CalendarRange size={18} aria-hidden="true" /> Kegiatan dan rundown</h3>
       <button className={layout.secondary} type="button" disabled={pending}
-        onClick={() => {setRevision(value => value + 1); if (selection) setSelection({id: selection.id});}}>Muat ulang kegiatan</button>
+        onClick={() => {setRevision(value => value + 1); if (selection) setSelection({id: selection.id});}}><RefreshCw size={16} /> Muat ulang kegiatan</button>
     </div>
     <p className={styles.context}>{project.fiscal_year} · {project.title}</p>
     {!current && <p role="status">Memuat kegiatan…</p>}
@@ -164,9 +164,9 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
           </li>)}
         </ul>
         <div className={styles.actions} aria-label="Halaman kegiatan">
-          <button className={layout.secondary} type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Sebelumnya</button>
+          <button className={layout.secondary} type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={16} /> Sebelumnya</button>
           <span role="status">Halaman {currentPage + 1} dari {Math.ceil(matches.length / 8)} · {matches.length} kegiatan</span>
-          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= matches.length} onClick={() => setPage(currentPage + 1)}>Berikutnya</button>
+          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= matches.length} onClick={() => setPage(currentPage + 1)}><ChevronRight size={16} /> Berikutnya</button>
         </div>
       </>}
     </>}
@@ -213,15 +213,15 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {uncertain && <p role="status">Hasil penyimpanan belum diketahui. Coba lagi dengan isian yang sama untuk memeriksa hasil tanpa membuat duplikat.</p>}
       <div className={styles.actions}>
-        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba simpan kembali' : editing ? 'Simpan perubahan kegiatan' : 'Simpan draf kegiatan'}</button>
-        <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={closeForm}>Batal</button>
+        <button className={layout.primary} type="submit" disabled={pending}><Save size={16} /> {pending ? 'Menyimpan…' : uncertain ? 'Coba simpan kembali' : editing ? 'Simpan perubahan kegiatan' : 'Simpan draf kegiatan'}</button>
+        <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={closeForm}><Close size={16} /> Batal</button>
       </div>
     </form>}
     {selection && <section id={id + '-detail'} className={styles.detail} aria-busy={!currentDetail} aria-labelledby={id + '-detail-heading'}>
       <h4 id={id + '-detail-heading'} ref={detailHeading} tabIndex={-1}>{currentDetail?.data?.activity.title || 'Detail kegiatan'}</h4>
       {!currentDetail && <p role="status">Memuat rundown…</p>}
       {currentDetail?.error && <><p className={styles.error} role="alert">{currentDetail.error}</p>
-        <button className={layout.secondary} type="button" onClick={() => setSelection({id: selection.id})}>Coba muat rundown lagi</button></>}
+        <button className={layout.secondary} type="button" onClick={() => setSelection({id: selection.id})}><RefreshCw size={16} /> Coba muat rundown lagi</button></>}
       {currentDetail?.data && <>
         <div className={styles.actions}>
           {currentDetail.data.can_write && <button ref={editButton} className={layout.secondary} type="button" disabled={creating}
@@ -233,9 +233,9 @@ export function ActivityWorkspace({endpoint, token, expire, project, people}) {
               setAgenda(data.agenda.map(row => ({key: crypto.randomUUID(), agenda_item_id: row.agenda_item_id,
                 start_time: row.start_time, end_time: row.end_time, title: row.title, speaker_person_id: row.speaker_person_id})));
               setCreating(true); setError(''); setMessage('');
-            }}>Sunting kegiatan</button>}
+            }}><Pencil size={16} /> Sunting kegiatan</button>}
           {currentDetail.data.reports_enabled && <button ref={reportButton} className={layout.secondary} type="button"
-            disabled={pending || uncertain} onClick={() => setReportOpen(true)}>Pratinjau dokumen kegiatan</button>}
+            disabled={pending || uncertain} onClick={() => setReportOpen(true)}><Eye size={16} /> Pratinjau dokumen kegiatan</button>}
         </div>
         <p>{date(currentDetail.data.activity.activity_date)} · {currentDetail.data.activity.activity_kind} · {status(currentDetail.data.activity.status)}</p>
         <p>{currentDetail.data.activity.location}</p>

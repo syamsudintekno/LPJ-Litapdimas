@@ -1,5 +1,5 @@
 import {useEffect, useId, useRef, useState} from 'react';
-import {Plus, ReceiptText, Trash2} from 'lucide-react';
+import {ChevronLeft, ChevronRight, Close, Pencil, Plus, ReceiptText, RefreshCw, Save, Trash2} from '../../components/ui/Icons.jsx';
 import {callProjectRpc} from '../../rpc.js';
 import {TaxReview} from '../taxes/TaxReview.jsx';
 import layout from '../../Home.module.css';
@@ -96,7 +96,7 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
     <div className={styles.actions}>
       <h3 id={id + '-heading'} ref={heading} tabIndex={-1}><ReceiptText size={18} aria-hidden="true" /> Transaksi proyek</h3>
       <button className={layout.secondary} type="button" disabled={pending || uncertain}
-        onClick={() => setRevision(value => value + 1)}>Muat ulang transaksi</button>
+        onClick={() => setRevision(value => value + 1)}><RefreshCw size={16} /> Muat ulang transaksi</button>
     </div>
     <p className={styles.context}>{project.fiscal_year} · {project.title}</p>
     {!current && <p role="status">Memuat transaksi…</p>}
@@ -121,7 +121,7 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
           {transactions.slice(currentPage * 8, currentPage * 8 + 8).map(row => <li key={row.transaction_id}>
             <div className={styles.actions}><h4>{row.description}</h4>
               {row.can_edit && <button className={layout.secondary} type="button" disabled={Boolean(draft)}
-                aria-label={'Sunting transaksi ' + row.description} onClick={event => open(row, event.currentTarget)}>Sunting</button>}
+                aria-label={'Sunting transaksi ' + row.description} onClick={event => open(row, event.currentTarget)}><Pencil size={16} /> Sunting</button>}
             </div>
             <p>{date(row.payment_date)} · {kinds[row.expense_kind]} · {status[row.status]}</p>
             <p className={styles.context}>{row.budget_item_label || 'Item RAB tidak tersedia'} · RAB versi {row.budget_version_no || '—'}</p>
@@ -143,9 +143,9 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
           </li>)}
         </ul>
         <div className={styles.actions} aria-label="Halaman transaksi">
-          <button className={layout.secondary} type="button" disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>Transaksi sebelumnya</button>
+          <button className={layout.secondary} type="button" disabled={!currentPage} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={16} /> Transaksi sebelumnya</button>
           <span role="status">Halaman {currentPage + 1} dari {Math.ceil(transactions.length / 8)} · {transactions.length} transaksi</span>
-          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= transactions.length} onClick={() => setPage(currentPage + 1)}>Transaksi berikutnya</button>
+          <button className={layout.secondary} type="button" disabled={(currentPage + 1) * 8 >= transactions.length} onClick={() => setPage(currentPage + 1)}><ChevronRight size={16} /> Transaksi berikutnya</button>
         </div>
       </>}
     </>}
@@ -201,10 +201,10 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {uncertain && <p role="status">Hasil simpan belum diketahui. Coba kembali dengan isian dan request yang sama untuk mencegah duplikasi.</p>}
       <div className={styles.actions}>
-        <button className={layout.primary} type="submit" disabled={pending}>{pending ? 'Menyimpan…' : uncertain ? 'Coba simpan transaksi kembali' : 'Simpan draf transaksi'}</button>
+        <button className={layout.primary} type="submit" disabled={pending}><Save size={16} /> {pending ? 'Menyimpan…' : uncertain ? 'Coba simpan transaksi kembali' : 'Simpan draf transaksi'}</button>
         <button className={layout.secondary} type="button" disabled={pending || uncertain} onClick={() => {
           setDraft(null); setEditing(null); setError(''); requestAnimationFrame(() => returnFocus.current?.isConnected ? returnFocus.current.focus() : heading.current?.focus());
-        }}>Batal</button>
+        }}><Close size={16} /> Batal</button>
       </div>
     </form>}
   </section>;
