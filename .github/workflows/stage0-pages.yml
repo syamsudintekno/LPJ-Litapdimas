@@ -16,6 +16,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - uses: actions/configure-pages@v5
       - name: Configure test endpoint
         env:
@@ -30,10 +36,13 @@ jobs:
               !/^[\w-]+\.apps\.googleusercontent\.com$/.test(google_client_id)) {
             throw new Error('Configure STAGE0_APPS_SCRIPT_URL and STAGE0_GOOGLE_CLIENT_ID in repository variables.');
           }
-          fs.writeFileSync('stage0/pages/config.json', JSON.stringify({apps_script_url, google_client_id}));
+          fs.cpSync('stage0/pages', 'dist/stage0', { recursive: true });
+          const config = JSON.stringify({apps_script_url, google_client_id});
+          fs.writeFileSync('dist/config.json', config);
+          fs.writeFileSync('dist/stage0/config.json', config);
           NODE
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: stage0/pages
+          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4

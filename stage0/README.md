@@ -1,5 +1,7 @@
 # Tahap 0 — GitHub Pages, Apps Script, dan Google Sheets
 
+Workflow GitHub Pages membangun halaman utama React/Vite di URL akar dan menyertakan panel uji akses di `/LPJ-Litapdimas/stage0/`. Gunakan panel tersebut untuk matriks uji di bawah. Untuk preview halaman utama, jalankan `pnpm install` lalu `pnpm dev`. Login lokal memerlukan `config.json` di akar checkout dan origin lokal yang terdaftar pada OAuth client. Workflow membuat konfigurasi deployment dari variabel GitHub Actions.
+
 ## Deployment uji dari GitHub Pages
 
 Gunakan Google Sheet uji privat yang sudah berisi proyek 2023 dan 2025 serta tiga akun uji. Apps Script membaca data dan memeriksa akun serta peran pada setiap permintaan. Panel GitHub Pages mengirim ID token Google dalam isi POST HTTPS. Token hanya disimpan di memori halaman selama sesi uji. Google mendokumentasikan `tokeninfo` untuk debugging, jadi deployment ini hanya untuk fixture sintetis. [Verifikasi token Google](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
@@ -10,7 +12,9 @@ Gunakan Google Sheet uji privat yang sudah berisi proyek 2023 dan 2025 serta tig
 4. Setelah kode tersedia di branch default repo, pilih **Settings → Pages → Source → GitHub Actions**. Di **Settings → Secrets and variables → Actions → Variables**, isi `STAGE0_APPS_SCRIPT_URL` dengan URL `/exec` dan `STAGE0_GOOGLE_CLIENT_ID` dengan Client ID. Jalankan workflow **Publish Stage 0 test page**. Workflow hanya memublikasikan panel dan konfigurasi klien. Client ID dan URL layanan memang dapat dilihat dari browser. [Workflow GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 5. Buka URL yang dilaporkan workflow. Login sebagai pemilik untuk memastikan POST dari `github.io` bisa membaca respons JSON setelah redirect Apps Script. Jika gagal, periksa **Network** di browser dan catat apakah masalahnya login, izin Sheets, atau pembacaan respons lintas origin. Jalankan skenario akun di matriks bawah dari GitHub Pages. Untuk tautan lama, gunakan URL Pages dengan `?project_id=<ID-A>`. Akun Google di luar undangan yang tokennya sah harus mendapat `FORBIDDEN`. Permintaan tanpa token harus mendapat `UNAUTHENTICATED`. [Redirect Content Service](https://developers.google.com/apps-script/guides/content#redirects).
 
-Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets yang disimulasikan. Endpoint Apps Script uji sudah mengembalikan JSON `UNAUTHENTICATED` tanpa data saat menerima POST tanpa token dengan header origin GitHub Pages. Login tiga akun, akses langsung berkas, dan pembacaan respons lintas origin dari browser GitHub Pages masih perlu diverifikasi.
+Sembilan pengujian lokal lulus dengan sesi Google, verifikasi token, dan Sheets yang disimulasikan. Endpoint Apps Script uji mengembalikan JSON `UNAUTHENTICATED` saat menerima POST tanpa token dengan header origin GitHub Pages.
+
+Pada 18 November 2026, [halaman uji GitHub Pages](https://syamsudintekno.github.io/LPJ-Litapdimas/) berhasil dibuka. Setelah login Google sebagai pemilik, browser menampilkan daftar dan detail proyek sintetis 2023 dan 2025 dengan peran `OWNER`. Uji hak tulis dan hak verifikasi pajak untuk proyek 2023 berhasil. Hasil ini memverifikasi bahwa browser GitHub Pages dapat membaca respons Apps Script untuk sesi pemilik. Uji kedua anggota, akun tanpa undangan, perubahan peran dan pencabutan, serta akses langsung ke Sheets dan Drive masih tertunda.
 
 ## Prototipe awal HTML Service
 

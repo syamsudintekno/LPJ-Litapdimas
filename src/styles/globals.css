@@ -1,0 +1,8 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font: 1rem/1.5 Inter, system-ui, sans-serif; }
+h1, h2, h3, p, dl, dd { margin: 0; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: .6; }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+[hidden] { display: none !important; }
