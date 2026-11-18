@@ -1,0 +1,9 @@
+.review { display: grid; min-width: 0; gap: 12px; justify-items: start; }
+.panel { display: grid; width: 100%; min-width: 0; gap: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.panel h5 { margin: 0; font-size: 16px; }
+.panel p { overflow-wrap: anywhere; }
+.notice { padding: 12px; color: var(--color-warning); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); }
+.rules { display: grid; min-width: 0; gap: 8px; margin: 0; padding-left: 20px; font-size: 14px; }
+.rules p { margin-top: 4px; }
+.proof { color: var(--color-primary); overflow-wrap: anywhere; }
+.review > button, .panel > button { justify-self: start; }

@@ -119,7 +119,8 @@ function transactionRpc_(spreadsheetId, user, request, role) {
           .map(({budget_item_id, label, version_no, is_current}) => ({budget_item_id, label, version_no, is_current})),
         activities: activities.map(({activity_id, title}) => ({activity_id, title})),
         payees: choices.map(({payee_id, payee_kind, legal_name}) => ({payee_id, payee_kind, legal_name})),
-        can_write: canWrite, can_create: canWrite && items.some(row => row.is_current), draft_total_amount: draftTotal, confirmed_total_amount: confirmedTotal});
+        can_write: canWrite, can_create: canWrite && items.some(row => row.is_current), draft_total_amount: draftTotal, confirmed_total_amount: confirmedTotal,
+        can_preview_taxes: PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true' && role !== 'VIEWER'});
     }
     if (!canWrite) return fail('VALIDATION_ERROR', 'Transaksi hanya dapat disimpan pada proyek draf atau aktif.');
     const before = edit ? transactions.find(row => row.transaction_id === payload.transaction_id) : null;

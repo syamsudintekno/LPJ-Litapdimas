@@ -97,7 +97,7 @@ function dispatch_(request, identify) {
       'budgets.save_version', 'budgets.approve_version', 'activities.list', 'activities.get',
       'activities.save', 'logbook.list', 'logbook.save', 'participants.list', 'participants.preview_import',
       'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
-      'transactions.list', 'transactions.save', 'stage0.write_probe', 'taxes.verify'];
+      'transactions.list', 'transactions.save', 'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -147,6 +147,15 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action.startsWith('taxes.')) {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      const role = roleFor(request.project_id);
+      if (!role || role === 'VIEWER' || (request.action === 'taxes.verify' && role !== 'OWNER')) {
+        return failure('FORBIDDEN', 'Verifikasi pajak hanya dapat dilakukan pemilik.');
+      }
+      return taxRpc_(spreadsheetId, user, request, role);
+    }
 
     if (request.action.startsWith('transactions.')) {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) {
@@ -218,7 +227,7 @@ function dispatch_(request, identify) {
       }
       const role = roleFor(request.project_id);
       if (!role || (request.action === 'stage0.write_probe' && role === 'VIEWER') ||
-          (request.action === 'taxes.verify' && !owner)) {
+          (request.action === 'stage0.tax_probe' && !owner)) {
         return failure('FORBIDDEN', 'Akun tidak memiliki hak untuk tindakan ini.');
       }
     }

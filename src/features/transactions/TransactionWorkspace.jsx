@@ -1,6 +1,7 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {Plus, ReceiptText, Trash2} from 'lucide-react';
 import {callProjectRpc} from '../../rpc.js';
+import {TaxReview} from '../taxes/TaxReview.jsx';
 import layout from '../../Home.module.css';
 import styles from './TransactionWorkspace.module.css';
 
@@ -133,6 +134,10 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
             <ul className={styles.payments} aria-label={'Pembayaran ' + row.description}>
               {row.payments.map(payment => <li key={payment.payment_detail_id}>
                 <strong>{payment.legal_name}</strong><span>Kwitansi {money(payment.receipt_amount)} · Potongan {money(payment.withheld_tax_amount)} · Diterima {money(payment.net_paid_amount)}</span>
+                {data.can_preview_taxes && <TaxReview endpoint={endpoint} token={token} expire={expire} projectId={project.project_id}
+                  paymentId={payment.payment_detail_id} disabled={Boolean(draft)} onVerified={() => {
+                    setRevision(value => value + 1); setMessage('Keputusan pajak tersimpan. Transaksi tetap draf sampai bukti dan realisasi dikonfirmasi pemilik.');
+                  }} />}
               </li>)}
             </ul>
           </li>)}

@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -36,6 +36,8 @@ function setup() {
   const verifier = {status: 200, calls: 0};
   const writes = {batches: 0, fail: false, locked: false};
   const cache = new Map();
+  const driveFiles = new Map();
+  const driveReads = [];
   const context = vm.createContext({
     Session: {getActiveUser: () => ({getEmail: () => email})},
     PropertiesService: {getScriptProperties: () => ({getProperty: key => properties[key]})},
@@ -70,6 +72,13 @@ function setup() {
       computeDigest: (algorithm, text, encoding) => createHash(algorithm).update(text, encoding).digest(),
       base64EncodeWebSafe: bytes => bytes.toString('base64url'),
     },
+    DriveApp: {Access: {PRIVATE: 'PRIVATE'}, getFileById(id) {
+      driveReads.push(id);
+      const file = driveFiles.get(id);
+      if (!file || file.fail) throw new Error('Berkas uji tidak tersedia.');
+      return {isTrashed: () => file.trashed || false, getSharingAccess: () => file.access || 'PRIVATE', getName: () => file.name || 'Bukti sintetis',
+        getLastUpdated: () => new Date(file.modified_at)};
+    }},
     Sheets: {Spreadsheets: {get() {
       return {sheets: Object.keys(sheets).map((title, sheetId) => ({properties: {title, sheetId}}))};
     }, batchUpdate({requests}) {
@@ -113,7 +122,7 @@ function setup() {
     assert.equal(response.mimeType, 'application/json');
     return JSON.parse(response.content);
   }
-  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache};
+  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache, driveFiles, driveReads, taxAmount: context.taxAmount_};
 }
 
 function setupLogbook() {
@@ -201,6 +210,157 @@ function setupTransactions() {
   const list = (account = env.editor, project = projectA) => env.rpc(account, 'transactions.list', project);
   return {...env, payload, save, list, itemA, itemB, payeeA, payeeB, versionA};
 }
+
+function setupTaxes() {
+  const env = setupTransactions();
+  const {sheets, properties, driveFiles} = env;
+  properties.TRANSACTIONS_ENABLED = 'true';
+  properties.TAXES_ENABLED = 'true';
+  const created = env.save().data;
+  const payment = env.list().data.transactions[0].payments[0];
+  sheets.people[0].push('civil_service_grade');
+  sheets.people[1].push('III/a');
+  sheets.tax_rule_versions = [['tax_rule_version_id', 'rule_code', 'version_no', 'tax_kind', 'expense_kind', 'payee_kind', 'eligibility', 'base_kind', 'rate_bps', 'effective_from', 'effective_to', 'source_ref', 'row_version', 'created_at', 'updated_at']];
+  const rule = [randomUUID(), 'SYNTHETIC_HONOR', 1, 'SYNTHETIC_WITHHOLDING', 'HONOR', 'PERSON', JSON.stringify({civil_service_grades: ['III/a']}),
+    'RECEIPT_AMOUNT', 500, '2026-01-01', '2026-12-31', 'Synthetic fixture, not a tax regulation', 1];
+  sheets.tax_assessments = [['tax_assessment_id', 'payment_detail_id', 'tax_rule_version_id', 'tax_kind', 'tax_treatment', 'tax_base_amount', 'amount', 'status',
+    'verified_by_user_id', 'verified_at', 'override_reason', 'decision_source_ref', 'evidence_attachment_id', 'evidence_row_version', 'evidence_drive_file_id', 'evidence_modified_at', 'rule_snapshot', 'row_version', 'created_at', 'updated_at']];
+  const evidenceId = randomUUID(); const driveId = 'synthetic-private-proof-01';
+  sheets.attachments = [['attachment_id', 'project_id', 'activity_id', 'transaction_id', 'attachment_kind', 'drive_file_id', 'row_version', 'created_at', 'updated_at'],
+    [evidenceId, env.projectA, '', created.transaction_id, 'PAYMENT_PROOF', driveId, 1]];
+  sheets.tax_remittance_allocations = [['tax_remittance_allocation_id', 'tax_remittance_id', 'tax_assessment_id', 'amount', 'row_version', 'created_at', 'updated_at']];
+  driveFiles.set(driveId, {modified_at: '2026-11-18T00:00:00.000Z'});
+  const preview = (account = env.owner, project = env.projectA) => env.rpc(account, 'taxes.preview', project, {payload: {payment_detail_id: payment.payment_detail_id}});
+  function decision(data = preview().data) {
+    return {payment_detail_id: payment.payment_detail_id, preview_token: data.preview_token,
+      expected_transaction_row_version: data.transaction.row_version, expected_payment_row_version: data.payment.row_version,
+      expected_assessment_row_version: data.assessment?.row_version || 0, evidence_attachment_id: evidenceId,
+      tax_rule_version_id: data.proposal.tax_rule_version_id, tax_kind: data.proposal.tax_kind || 'SYNTHETIC_WITHHOLDING',
+      tax_base_amount: data.payment.receipt_amount, amount: data.proposal.amount ?? data.payment.withheld_tax_amount, status: 'VERIFIED',
+      decision_source_ref: 'Synthetic source reference', override_reason: ''};
+  }
+  const verify = (payload, id = randomUUID(), account = env.owner, project = env.projectA) =>
+    env.rpc(account, 'taxes.verify', project, {request_id: id, payload});
+  return {...env, created, payment, rule, evidenceId, driveId, preview, decision, verify};
+}
+
+test('pratinjau pajak memakai tanggal/golongan, menghindari aturan tumpang tindih, dan menghitung basis point tanpa overflow', () => {
+  const {preview, sheets, rule, taxAmount, editor, viewer, driveReads} = setupTaxes();
+  assert.equal(taxAmount(900000, 500), 45000);
+  assert.equal(taxAmount(1, 5000), 1);
+  assert.equal(taxAmount(Number.MAX_SAFE_INTEGER, 10000), Number.MAX_SAFE_INTEGER);
+  assert.equal(taxAmount(Number.MAX_SAFE_INTEGER + 1, 500), null);
+  assert.equal(preview().data.proposal.reason, 'NO_MATCHING_RULE');
+  sheets.tax_rule_versions.push(rule);
+  assert.equal(preview().data.proposal.amount, 45000);
+  assert.equal(preview().data.proposal.status, 'PENDING');
+  const profileRef = sheets.payees[1][4];
+  sheets.payees[1][4] = '';
+  assert.equal(preview().data.proposal.reason, 'PROFILE_INCOMPLETE');
+  sheets.payees[1][4] = profileRef;
+  driveReads.length = 0;
+  assert.equal(preview(editor).data.proposal.amount, 45000);
+  assert.equal(preview(editor).data.can_verify, false);
+  assert.equal(preview(editor).data.evidence.length, 0);
+  assert.equal(JSON.stringify(preview(editor).data).includes('private-profile-A'), false);
+  assert.deepEqual(driveReads, []);
+  assert.equal(preview(viewer).error.code, 'FORBIDDEN');
+  sheets.tax_rule_versions.push([randomUUID(), ...rule.slice(1)]);
+  sheets.tax_rule_versions[2][2] = 2;
+  assert.equal(preview().data.proposal.reason, 'OVERLAPPING_RULES');
+  assert.equal(preview().data.proposal.amount, null);
+  sheets.tax_rule_versions.pop();
+  sheets.tax_rule_versions[1][10] = '2026-11-17';
+  assert.equal(preview().data.proposal.reason, 'NO_MATCHING_RULE');
+  sheets.tax_rule_versions[1][10] = '2026-12-31';
+  sheets.people[1][3] = '';
+  assert.equal(preview().data.proposal.reason, 'PROFILE_INCOMPLETE');
+  sheets.people[1][3] = 'III/a';
+  sheets.transactions[1][5] = 'SNACK';
+  sheets.tax_rule_versions[1][4] = 'SNACK';
+  assert.equal(preview().data.proposal.reason, 'CLASSIFICATION_REVIEW_REQUIRED');
+  assert.equal(preview().data.proposal.amount, null);
+});
+
+test('verifikasi pajak hanya oleh pemilik, menyimpan versi/bukti/referensi, memperbarui netto atomik, dan mengaudit koreksi', () => {
+  const {preview, verify, decision, sheets, rule, editor, writes, list} = setupTaxes();
+  sheets.tax_rule_versions.push(rule);
+  const payload = decision();
+  assert.equal(verify(payload, randomUUID(), editor).error.code, 'FORBIDDEN');
+  const id = randomUUID();
+  writes.fail = true;
+  assert.equal(verify(payload, id).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(sheets.tax_assessments.length, 1);
+  assert.equal(sheets.payment_details[1][7], 1);
+  writes.fail = false;
+  const first = verify(payload, id).data;
+  assert.equal(first.net_paid_amount, 855000);
+  assert.equal(first.payment_row_version, 2);
+  assert.equal(first.transaction_row_version, 2);
+  assert.deepEqual(verify(payload, id).data, first);
+  assert.equal(verify({...payload, amount: 1}, id).error.code, 'CONFLICT');
+  const reviewed = preview().data;
+  assert.equal(reviewed.needs_review, false);
+  assert.equal(reviewed.assessment.tax_rule_version_id, rule[0]);
+  assert.equal(JSON.parse(reviewed.assessment.rule_snapshot).rate_bps, 500);
+  assert.equal(reviewed.assessment.evidence_row_version, 1);
+  assert.equal(reviewed.assessment.decision_source_ref, payload.decision_source_ref);
+  assert.equal(preview(editor).data.assessment.evidence_drive_file_id, undefined);
+  assert.equal(list().data.transactions[0].status, 'DRAFT');
+  assert.equal(list().data.confirmed_total_amount, 0);
+  assert.equal(list().data.transactions[0].can_edit, false);
+  const corrected = {...decision(reviewed), status: 'NOT_APPLICABLE', tax_rule_version_id: '', amount: 0};
+  assert.equal(verify(corrected).error.code, 'VALIDATION_ERROR');
+  const correctionId = randomUUID();
+  corrected.override_reason = 'Synthetic correction according to reviewed evidence';
+  const second = verify(corrected, correctionId).data;
+  assert.equal(second.net_paid_amount, 900000);
+  assert.equal(second.status, 'NOT_APPLICABLE');
+  assert.equal(sheets.tax_assessments.length, 2);
+  assert.equal(sheets.tax_assessments[1][0], first.tax_assessment_id);
+  const audit = JSON.parse(sheets.audit_log[3][8]);
+  assert.equal(audit.before.amount, 45000);
+  assert.equal(audit.after.amount, 0);
+  assert.equal(audit.after.override_reason, corrected.override_reason);
+  assert.equal(writes.batches, 3);
+  assert.equal(writes.locked, false);
+});
+
+test('verifikasi pajak menolak perubahan bukti/versi, bukti publik/asing, token lama, serta pembayaran yang tertaut setoran', () => {
+  const {preview, verify, decision, sheets, rule, evidenceId, driveId, driveFiles, cache, owner, projectB} = setupTaxes();
+  sheets.tax_rule_versions.push(rule);
+  assert.equal(preview(owner, projectB).error.code, 'NOT_FOUND');
+  let payload = decision();
+  sheets.tax_rule_versions[1][8] = 501;
+  assert.equal(verify(payload).error.code, 'CONFLICT');
+  sheets.tax_rule_versions[1][8] = 500;
+  const profileRef = sheets.payees[1][4];
+  sheets.payees[1][4] = 'changed-private-profile';
+  assert.equal(verify(payload).error.code, 'CONFLICT');
+  sheets.payees[1][4] = profileRef;
+  driveFiles.get(driveId).modified_at = '2026-11-18T01:00:00.000Z';
+  assert.equal(verify(payload).error.code, 'CONFLICT');
+  payload = decision();
+  assert.equal(verify({...payload, evidence_attachment_id: randomUUID()}).error.code, 'VALIDATION_ERROR');
+  assert.equal(verify({...payload, expected_payment_row_version: 99}).error.code, 'CONFLICT');
+  cache.clear();
+  assert.equal(verify(payload).error.code, 'CONFLICT');
+  driveFiles.get(driveId).access = 'ANYONE_WITH_LINK';
+  const unavailable = preview().data;
+  assert.equal(unavailable.evidence[0].available, false);
+  assert.equal(verify(decision(unavailable)).error.code, 'VALIDATION_ERROR');
+  driveFiles.get(driveId).access = 'PRIVATE';
+  const firstPayload = decision();
+  const firstId = randomUUID();
+  const first = verify(firstPayload, firstId).data;
+  driveFiles.get(driveId).modified_at = '2026-11-18T02:00:00.000Z';
+  assert.deepEqual(verify(firstPayload, firstId).data, first);
+  assert.equal(preview().data.needs_review, true);
+  const correction = {...decision(), override_reason: 'Synthetic correction after evidence update'};
+  sheets.tax_remittance_allocations.push([randomUUID(), randomUUID(), first.tax_assessment_id, 45000, 1]);
+  assert.equal(preview().data.can_verify, false);
+  assert.equal(verify(correction).error.code, 'CONFLICT');
+});
 
 test('transaksi menghitung netto di server, menjaga versi dan audit, serta mengulang hasil tanpa duplikasi', () => {
   const {payload, save, list, sheets, properties, writes, rpc, owner, projectA} = setupTransactions();
@@ -767,7 +927,7 @@ test('pemilik melihat kedua tahun dan lulus kedua pemeriksaan hak', () => {
   for (const project of [projectA, projectB]) {
     assert.equal(rpc(owner, 'projects.get', project).data.access_role, 'OWNER');
     assert.equal(rpc(owner, 'stage0.write_probe', project).data.authorized, true);
-    assert.equal(rpc(owner, 'taxes.verify', project).data.authorized, true);
+    assert.equal(rpc(owner, 'stage0.tax_probe', project).data.authorized, true);
   }
 });
 
@@ -808,7 +968,7 @@ test('editor hanya dapat membaca dan menguji hak tulis proyek yang ditugaskan', 
   for (const action of ['projects.get', 'stage0.write_probe']) {
     assert.equal(rpc(editor, action, projectB).error.code, 'FORBIDDEN');
   }
-  assert.equal(rpc(editor, 'taxes.verify', projectA).error.code, 'FORBIDDEN');
+  assert.equal(rpc(editor, 'stage0.tax_probe', projectA).error.code, 'FORBIDDEN');
 });
 
 test('viewer ditolak saat menguji hak tulis atau mengirim ID lintas proyek', () => {
@@ -817,7 +977,7 @@ test('viewer ditolak saat menguji hak tulis atau mengirim ID lintas proyek', () 
   assert.equal(rpc(viewer, 'projects.get', projectB).data.access_role, 'VIEWER');
   assert.equal(rpc(viewer, 'projects.get', projectA).error.code, 'FORBIDDEN');
   assert.equal(rpc(viewer, 'stage0.write_probe', projectB).error.code, 'FORBIDDEN');
-  assert.equal(rpc(viewer, 'taxes.verify', projectB).error.code, 'FORBIDDEN');
+  assert.equal(rpc(viewer, 'stage0.tax_probe', projectB).error.code, 'FORBIDDEN');
 });
 
 test('sesi yang sama kehilangan hak tulis ketika diturunkan dan hak baca setelah dicabut', () => {
