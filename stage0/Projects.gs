@@ -2,7 +2,15 @@ const REQUIRED_PROJECT_ROLES_ = ['Ketua', 'Penanggung Jawab', 'PPK', 'Bendahara 
 const OPTIONAL_PROJECT_ROLES_ = ['Anggota Peneliti', 'Mahasiswa', 'Pejabat Tambahan'];
 const PROJECT_UUID_ = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
-function projectValidation_(project, assignments, stages) {
+function projectStudentValid_(student) {
+  return student && typeof student === 'object' && !Array.isArray(student) &&
+    typeof student.display_name === 'string' && student.display_name.trim().length > 0 && student.display_name.length <= 240 &&
+    typeof student.nip === 'string' && typeof student.nim === 'string' &&
+    (student.nip === '' || /^\d{5,30}$/.test(student.nip)) &&
+    (student.nim === '' || /^[a-z0-9][a-z0-9-]{2,39}$/i.test(student.nim)) && Boolean(student.nip || student.nim);
+}
+
+function projectValidation_(project, assignments, stages, creating = false) {
   if (typeof project.title !== 'string' || !project.title.trim() || project.title.length > 240 ||
       typeof project.project_code !== 'string' || project.project_code.length > 80 ||
       !Number.isInteger(project.fiscal_year) || project.fiscal_year < 1900 || project.fiscal_year > 9999 ||
@@ -10,14 +18,21 @@ function projectValidation_(project, assignments, stages) {
     return 'Isi judul, tahun anggaran, dan plafon rupiah yang valid.';
   }
   if (!Array.isArray(assignments) || assignments.length > 40 ||
-      !assignments.every(row => row && typeof row.person_id === 'string' && PROJECT_UUID_.test(row.person_id) &&
-        [...REQUIRED_PROJECT_ROLES_, ...OPTIONAL_PROJECT_ROLES_].includes(row.assignment_role))) {
+      !assignments.every(row => row && [...REQUIRED_PROJECT_ROLES_, ...OPTIONAL_PROJECT_ROLES_].includes(row.assignment_role) &&
+        (creating && row.assignment_role === 'Mahasiswa' ? row.person_id === undefined && projectStudentValid_(row.student) :
+          row.student === undefined && typeof row.person_id === 'string' && PROJECT_UUID_.test(row.person_id)))) {
     return 'Periksa daftar personel dan perannya.';
   }
   if (REQUIRED_PROJECT_ROLES_.some(role => assignments.filter(row => row.assignment_role === role).length !== 1)) {
     return 'Pilih ketua, penanggung jawab, PPK, dan Bendahara Pengeluaran.';
   }
-  if (new Set(assignments.map(row => row.assignment_role + ':' + row.person_id)).size !== assignments.length) {
+  const referenced = assignments.filter(row => row.person_id);
+  const students = assignments.filter(row => row.student);
+  if (new Set(referenced.map(row => row.assignment_role + ':' + row.person_id)).size !== referenced.length ||
+      ['nip', 'nim'].some(key => {
+        const ids = students.map(row => row.student[key]?.toLowerCase()).filter(Boolean);
+        return new Set(ids).size !== ids.length;
+      })) {
     return 'Orang yang sama tercantum lebih dari satu kali pada peran yang sama.';
   }
   if (!Array.isArray(stages) || !stages.length || stages.length > 10 ||
@@ -52,7 +67,7 @@ function writeProject_(spreadsheetId, user, request) {
   }
   const submitted = payload?.project ?? {};
   if (create) {
-    const error = projectValidation_(submitted, payload?.personnel, payload?.stages);
+    const error = projectValidation_(submitted, payload?.personnel, payload?.stages, true);
     if (error) return fail('VALIDATION_ERROR', error);
   }
 
@@ -69,6 +84,7 @@ function writeProject_(spreadsheetId, user, request) {
       return ok(JSON.parse(previous.result_ref));
     }
     const names = ['projects', 'project_people', 'report_stages', 'audit_log', 'mutation_requests'];
+    if (create && payload.personnel.some(row => row.student)) names.push('people');
     const metadata = Sheets.Spreadsheets.get(spreadsheetId, {fields: 'sheets(properties(sheetId,title))'});
     const sheets = Object.fromEntries(metadata.sheets.map(sheet => [sheet.properties.title, sheet.properties.sheetId]));
     const tables = Object.fromEntries(names.map(name => {
@@ -134,10 +150,34 @@ function writeProject_(spreadsheetId, user, request) {
       }
     }
 
-    const activePeople = rows_(spreadsheetId, 'people', ['person_id'], ['active'])
-      .filter(person => person.active === true || !Object.prototype.hasOwnProperty.call(person, 'active'));
+    const people = rows_(spreadsheetId, 'people', ['person_id'], ['person_kind', 'display_name', 'nip', 'nim', 'active']);
+    if (new Set(people.map(person => person.person_id)).size !== people.length) return fail('CONFLICT', 'ID Master Personel tidak konsisten.');
+    const activePeople = people.filter(person => person.active === true || !Object.prototype.hasOwnProperty.call(person, 'active'));
     const personIds = new Set(activePeople.map(person => person.person_id));
-    if (assignments.some(row => !personIds.has(row.person_id))) return fail('VALIDATION_ERROR', 'Ada personel yang sudah tidak tersedia.');
+    if (assignments.some(row => row.person_id && !personIds.has(row.person_id))) return fail('VALIDATION_ERROR', 'Ada personel yang sudah tidak tersedia.');
+
+    const newStudents = [];
+    if (create) {
+      const resolved = [];
+      for (const row of assignments) {
+        if (!row.student) {resolved.push(row); continue;}
+        const student = {display_name: row.student.display_name.trim(), nip: row.student.nip, nim: row.student.nim};
+        const matches = people.filter(person => (student.nip && person.nip === student.nip) ||
+          (student.nim && typeof person.nim === 'string' && person.nim.toLowerCase() === student.nim.toLowerCase()));
+        const match = matches.length === 1 ? matches[0] : null;
+        if (matches.length && (!match || match.person_kind !== 'MAHASISWA' || !personIds.has(match.person_id) ||
+            match.display_name !== student.display_name || (match.nip || '') !== student.nip ||
+            String(match.nim || '').toLowerCase() !== student.nim.toLowerCase())) {
+          return fail('CONFLICT', 'NIP/NIM mahasiswa sudah terdaftar dengan identitas berbeda atau tidak aktif. Periksa isian sebelum menyimpan.');
+        }
+        const personId = match?.person_id || Utilities.getUuid();
+        if (!match) newStudents.push({person_id: personId, person_kind: 'MAHASISWA', ...student, unit_name: '', civil_service_grade: '', active: true, ...timestamps});
+        resolved.push({assignment_role: row.assignment_role, person_id: personId});
+      }
+      if (new Set(resolved.map(row => row.assignment_role + ':' + row.person_id)).size !== resolved.length) return fail('VALIDATION_ERROR', 'Mahasiswa yang sama tercantum lebih dari sekali.');
+      assignments = resolved;
+      if (newStudents.length) append('people', newStudents);
+    }
 
     if (create) {
       append('projects', [project]);
@@ -153,7 +193,8 @@ function writeProject_(spreadsheetId, user, request) {
     append('audit_log', [{
       audit_id: Utilities.getUuid(), request_id, user_id: user.user_id, project_id: id, action,
       entity_type: 'project', entity_id: id, occurred_at: time,
-      change_summary: JSON.stringify(create ? {status, row_version: version, official_ceiling_amount: project.official_ceiling_amount}
+      change_summary: JSON.stringify(create ? {status, row_version: version, official_ceiling_amount: project.official_ceiling_amount,
+        created_student_ids: newStudents.map(person => person.person_id)}
         : {status, row_version: version}),
     }]);
     append('mutation_requests', [{

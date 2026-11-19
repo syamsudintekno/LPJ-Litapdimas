@@ -59,7 +59,9 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
   const payload = {
     project: {...identity, title: identity.title.trim(), project_code: identity.project_code.trim(),
       fiscal_year: Number(identity.fiscal_year), official_ceiling_amount: Number(identity.official_ceiling_amount)},
-    personnel: assignments.map(row => ({assignment_role: row.assignment_role, person_id: row.person?.person_id})),
+    personnel: assignments.map(row => ({assignment_role: row.assignment_role, ...(row.assignment_role === 'Mahasiswa'
+      ? {student: {display_name: (row.student?.display_name || '').trim(), nip: (row.student?.nip || '').trim(), nim: (row.student?.nim || '').trim()}}
+      : {person_id: row.person?.person_id})})),
     stages: stages.map((row, index) => ({
       sequence_no: index + 1, label: row.label.trim(), target_bps: Math.round(Number(row.target) * 100), cutoff_date: row.cutoff_date,
     })),
@@ -114,7 +116,22 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
           ? '50 hasil pertama. Persempit kata kunci untuk melihat hasil lain.'
           : people.total ? people.total + ' personel ditemukan.' : 'Tidak ada personel yang cocok.'}</p>}
       {roles.map(role => <div key={role} className={styles.group}>
+        {role === 'Mahasiswa' && <p>Nama dan NIP/NIM mahasiswa diketik langsung. Isi setidaknya salah satu nomor identitas; tidak perlu menyiapkan data di Google Sheets.</p>}
         {assignments.filter(row => row.assignment_role === role).map(row => {
+          if (role === 'Mahasiswa') return <fieldset key={row.key}>
+            <legend>Mahasiswa {assignments.filter(item => item.assignment_role === role).findIndex(item => item.key === row.key) + 1}</legend>
+            <div className={styles.fields}>
+              {[
+                ['display_name', 'Nama mahasiswa', {required: true, maxLength: 240, pattern: '.*\\S.*'}],
+                ['nip', 'NIP mahasiswa (jika ada)', {required: !row.student?.nim?.trim(), inputMode: 'numeric', maxLength: 30, pattern: '[0-9]{5,30}'}],
+                ['nim', 'NIM mahasiswa (jika ada)', {required: !row.student?.nip?.trim(), maxLength: 40, pattern: '[a-zA-Z0-9][a-zA-Z0-9-]{2,39}'}],
+              ].map(([field, label, properties]) => <label key={field}>{label}
+                <input type="text" {...properties} value={row.student?.[field] || ''} onChange={event => setAssignments(items =>
+                  items.map(item => item.key === row.key ? {...item, student: {...item.student, [field]: event.target.value}} : item))} />
+              </label>)}
+            </div>
+            <button type="button" className={layout.secondary} onClick={() => setAssignments(items => items.filter(item => item.key !== row.key))}><Trash2 size={16} /> Hapus Mahasiswa</button>
+          </fieldset>;
           const matches = people?.people ?? [];
           const options = row.person && !matches.some(item => item.person_id === row.person.person_id)
             ? [row.person, ...matches] : matches;
@@ -188,7 +205,9 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
         <h3>{payload.project.title}</h3>
         <p>Tahun {identity.fiscal_year} · {money.format(payload.project.official_ceiling_amount)}</p>
         {payload.project.project_code && <p>Kode proyek {payload.project.project_code}</p>}
-        <ul>{assignments.map(row => <li key={row.key}>{row.assignment_role} · {row.person?.display_name}</li>)}</ul>
+        <ul>{assignments.map(row => <li key={row.key}>{row.assignment_role} · {row.assignment_role === 'Mahasiswa'
+          ? [row.student?.display_name, row.student?.nip && 'NIP ' + row.student.nip, row.student?.nim && 'NIM ' + row.student.nim].filter(Boolean).join(' · ')
+          : row.person?.display_name}</li>)}</ul>
         <ul>{payload.stages.map(stage => <li key={stage.sequence_no}>
           {stage.label} · {percent.format(stage.target_bps / 10000)} · {stage.cutoff_date}
         </li>)}</ul>

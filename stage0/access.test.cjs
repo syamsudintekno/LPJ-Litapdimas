@@ -1495,6 +1495,77 @@ test('pembuatan draf dan aktivasi memeriksa izin, integritas, versi, dan idempot
   assert.equal(sheets.mutation_requests.length, 3);
 });
 
+function setupStudentWizard() {
+  const env = setup();
+  const {sheets, properties, rpc, owner} = env;
+  const stamp = ['row_version', 'created_at', 'updated_at'];
+  sheets.projects[0].push('official_ceiling_amount', 'status', 'active_budget_version_id', ...stamp);
+  sheets.project_people[0].push(...stamp);
+  sheets.people[0].push('nip', 'nim', 'unit_name', 'civil_service_grade', 'active', ...stamp);
+  sheets.people.slice(1).forEach(row => row.push('', '', '', '', true, 1));
+  sheets.report_stages = [['report_stage_id', 'project_id', 'sequence_no', 'label', 'target_bps', 'cutoff_date', 'status', ...stamp]];
+  sheets.audit_log = [['audit_id', 'request_id', 'user_id', 'project_id', 'action', 'entity_type', 'entity_id', 'occurred_at', 'change_summary']];
+  sheets.mutation_requests = [['request_id', 'user_id', 'action', 'payload_digest', 'result_ref', 'status', ...stamp]];
+  properties.PROJECT_WRITES_ENABLED = 'true';
+  const payload = {project: {title: 'Proyek mahasiswa sintetis', project_code: 'UJI', fiscal_year: 2026, official_ceiling_amount: 17500000},
+    personnel: [...['Ketua', 'Penanggung Jawab', 'PPK', 'Bendahara Pengeluaran'].map(assignment_role => ({assignment_role, person_id: sheets.people[1][0]})),
+      {assignment_role: 'Mahasiswa', student: {display_name: '=Mahasiswa sintetis', nip: '001234567890', nim: ''}}],
+    stages: [{sequence_no: 1, label: 'Final', target_bps: 10000, cutoff_date: '2026-12-31'}]};
+  const save = (data = payload, id = randomUUID(), account = owner) => rpc(account, 'projects.save', undefined, {payload: data, request_id: id});
+  const person = row => Object.fromEntries(sheets.people[0].map((field, i) => [field, row[i]]));
+  return {...env, payload, save, person};
+}
+
+test('mahasiswa diketik langsung, nama/NIP teks disimpan atomik bersama proyek dan retry tidak menduplikasi', () => {
+  const e = setupStudentWizard(); const {sheets, save, payload, writes, rpc, owner, person} = e;
+  const before = JSON.stringify(sheets), id = randomUUID();
+  writes.fail = true; assert.equal(save(payload, id).error.code, 'TEMPORARY_FAILURE');
+  assert.equal(JSON.stringify(sheets), before); writes.fail = false;
+  const result = save(payload, id); assert.equal(result.ok, true);
+  const student = person(sheets.people.at(-1));
+  assert.equal(student.person_kind, 'MAHASISWA'); assert.equal(student.display_name, '=Mahasiswa sintetis');
+  assert.equal(student.nip, '001234567890'); assert.equal(typeof student.nip, 'string'); assert.equal(student.nim, '');
+  const assignment = sheets.project_people.at(-1);
+  assert.equal(assignment[2], student.person_id); assert.equal(assignment[3], 'Mahasiswa');
+  const length = sheets.people.length, batches = writes.batches;
+  assert.deepEqual(save(payload, id), result); assert.equal(sheets.people.length, length); assert.equal(writes.batches, batches);
+  assert.equal(rpc(owner, 'projects.activate', result.data.project_id, {payload: {expected_row_version: 1}}).ok, true);
+});
+
+test('input mahasiswa memeriksa nomor teks, peran, duplikasi dan izin; NIM saja didukung', () => {
+  for (const change of [
+    p => {p.personnel.at(-1).student.nip = 123456;},
+    p => {p.personnel.at(-1).student.display_name = ' ';},
+    p => {p.personnel.at(-1).student.nip = '';},
+    p => {p.personnel.at(-1).student.nip = '12e10';},
+    p => {p.personnel.at(-1).student.nim = 'x';},
+    p => {p.personnel.at(-1).assignment_role = 'Ketua';},
+    p => {p.personnel.push(structuredClone(p.personnel.at(-1)));},
+    p => {p.personnel.at(-1).person_id = randomUUID();},
+    p => {p.personnel[p.personnel.length - 1] = {assignment_role: 'Mahasiswa', person_id: p.personnel[0].person_id};},
+  ]) {
+    const e = setupStudentWizard(); const before = JSON.stringify(e.sheets); change(e.payload);
+    assert.equal(e.save().error.code, 'VALIDATION_ERROR'); assert.equal(JSON.stringify(e.sheets), before);
+  }
+  const e = setupStudentWizard(); assert.equal(e.save(e.payload, randomUUID(), e.editor).error.code, 'FORBIDDEN');
+  e.payload.personnel.at(-1).student = {display_name: 'Mahasiswa NIM', nip: '', nim: '00123-AB', person_id: e.sheets.people[1][0], person_kind: 'DOSEN'};
+  assert.equal(e.save().ok, true);
+  const student = e.person(e.sheets.people.at(-1)); assert.equal(student.nim, '00123-AB'); assert.equal(student.person_kind, 'MAHASISWA');
+  assert.notEqual(student.person_id, e.sheets.people[1][0]);
+});
+
+test('isian mahasiswa identik memakai identitas yang sama tanpa menimpa master; konflik/inaktif ditolak', () => {
+  const e = setupStudentWizard(); assert.equal(e.save().ok, true);
+  const before = JSON.stringify(e.sheets.people), student = e.person(e.sheets.people.at(-1));
+  assert.equal(e.save().ok, true); assert.equal(JSON.stringify(e.sheets.people), before);
+  assert.equal(e.sheets.project_people.at(-1)[2], student.person_id);
+  e.payload.personnel.at(-1).student.display_name = 'Nama berbeda';
+  assert.equal(e.save().error.code, 'CONFLICT'); assert.equal(JSON.stringify(e.sheets.people), before);
+  e.payload.personnel.at(-1).student.display_name = student.display_name;
+  e.sheets.people.at(-1)[e.sheets.people[0].indexOf('active')] = false;
+  assert.equal(e.save().error.code, 'CONFLICT');
+});
+
 test('pemilik melihat kedua tahun dan lulus kedua pemeriksaan hak', () => {
   const {rpc, owner, projectA, projectB} = setup();
   const list = rpc(owner, 'projects.list').data.projects;
