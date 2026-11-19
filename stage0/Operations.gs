@@ -81,7 +81,7 @@ function operationFile_(folder, name, blob) {
 }
 
 // Explicit owner setup. Appends missing headers and creates missing tables, never rewrites existing data.
-function prepareWorkspace() {
+function prepareWorkspace_() {
   const props = PropertiesService.getScriptProperties(), spreadsheetId = props.getProperty('SPREADSHEET_ID');
   const email = normalizeEmail_(Session.getActiveUser().getEmail());
   const owners = rows_(spreadsheetId, 'users', ['user_id', 'login_email', 'system_role', 'active']).filter(row => normalizeEmail_(row.login_email) === email && row.system_role === 'OWNER' && row.active === true);

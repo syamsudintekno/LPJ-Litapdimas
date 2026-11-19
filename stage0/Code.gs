@@ -1,3 +1,8 @@
+// Manual owner setup, intentionally visible in the Code.gs Run menu.
+function prepareWorkspace() {
+  return prepareWorkspace_();
+}
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Uji akses LPJ Litapdimas')
