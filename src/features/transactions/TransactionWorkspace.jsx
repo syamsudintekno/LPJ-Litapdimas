@@ -4,6 +4,7 @@ import {callProjectRpc} from '../../rpc.js';
 import {TaxReview} from '../taxes/TaxReview.jsx';
 import {TransactionEvidence} from './TransactionEvidence.jsx';
 import {TransactionConfirmation} from './TransactionConfirmation.jsx';
+import {ReceiptControl} from './ReceiptPreview.jsx';
 import layout from '../../Home.module.css';
 import styles from './TransactionWorkspace.module.css';
 
@@ -145,6 +146,11 @@ export function TransactionWorkspace({endpoint, token, expire, project}) {
                 {data.can_preview_taxes && <TaxReview endpoint={endpoint} token={token} expire={expire} projectId={project.project_id}
                   paymentId={payment.payment_detail_id} disabled={Boolean(draft)} onVerified={() => {
                     setRevision(value => value + 1); setMessage('Keputusan pajak tersimpan. Transaksi tetap draf sampai bukti dan realisasi dikonfirmasi pemilik.');
+                  }} />}
+                {(payment.receipt || (data.can_issue_receipts && row.status === 'CONFIRMED')) && <ReceiptControl endpoint={endpoint} token={token} expire={expire}
+                  projectId={project.project_id} paymentId={payment.payment_detail_id} receipt={payment.receipt} disabled={Boolean(draft)} onIssued={() => {
+                    setRevision(value => value + 1); setMessage('Kwitansi diterbitkan. Nomor dan isi salinan tersimpan sebagai snapshot.');
+                    requestAnimationFrame(() => heading.current?.focus());
                   }} />}
               </li>)}
             </ul>

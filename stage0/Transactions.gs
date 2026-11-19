@@ -92,7 +92,7 @@ function transactionRpc_(spreadsheetId, user, request, role) {
       (role === 'OWNER' || allowedPeople.has(row.person_id) || knownPayees.has(row.payee_id)));
     const canWrite = ['OWNER', 'EDITOR'].includes(role) && ['DRAFT', 'ACTIVE'].includes(project.status);
     const assessments = rows_(spreadsheetId, 'tax_assessments', ['payment_detail_id']);
-    const receipts = rows_(spreadsheetId, 'receipts', ['payment_detail_id']);
+    const receipts = rows_(spreadsheetId, 'receipts', ['payment_detail_id'], ['receipt_id', 'receipt_no', 'issued_on', 'status']);
     const distributions = rows_(spreadsheetId, 'distributions', ['transaction_id']);
     const locked = transaction => distributions.some(row => row.transaction_id === transaction.transaction_id) ||
       payments.filter(row => row.transaction_id === transaction.transaction_id).some(payment =>
@@ -112,7 +112,8 @@ function transactionRpc_(spreadsheetId, user, request, role) {
           budget_version_no: items.find(item => item.budget_item_id === transaction.budget_item_id)?.version_no || null,
           budget_item_label: items.find(item => item.budget_item_id === transaction.budget_item_id)?.label || '',
           activity_title: activities.find(row => row.activity_id === transaction.activity_id)?.title || '',
-          payments: rows.map(payment => ({...payment, legal_name: allPayees.find(row => row.payee_id === payment.payee_id)?.legal_name || 'Penerima tidak tersedia'}))});
+          payments: rows.map(payment => ({...payment, legal_name: allPayees.find(row => row.payee_id === payment.payee_id)?.legal_name || 'Penerima tidak tersedia',
+            receipt: receipts.find(row => row.payment_detail_id === payment.payment_detail_id && row.status === 'ISSUED') || null}))});
       }
       return ok({transactions: result.sort((a, b) => b.payment_date.localeCompare(a.payment_date) || a.transaction_id.localeCompare(b.transaction_id)),
         budget_items: items.filter(row => row.is_current || transactions.some(transaction => transaction.budget_item_id === row.budget_item_id))
@@ -122,6 +123,7 @@ function transactionRpc_(spreadsheetId, user, request, role) {
         can_write: canWrite, can_create: canWrite && items.some(row => row.is_current), draft_total_amount: draftTotal, confirmed_total_amount: confirmedTotal,
         can_manage_attachments: PropertiesService.getScriptProperties().getProperty('ATTACHMENTS_ENABLED') === 'true' && role !== 'VIEWER',
         can_confirm_transactions: role === 'OWNER' && PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true',
+        can_issue_receipts: role === 'OWNER' && PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true',
         can_preview_taxes: PropertiesService.getScriptProperties().getProperty('TAXES_ENABLED') === 'true' && role !== 'VIEWER'});
     }
     if (!canWrite) return fail('VALIDATION_ERROR', 'Transaksi hanya dapat disimpan pada proyek draf atau aktif.');

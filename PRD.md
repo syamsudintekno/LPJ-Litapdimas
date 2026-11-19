@@ -35,7 +35,9 @@ Untuk LPJ-06/09, pemilik mengelola aturan global lintas proyek sebagai versi yan
 
 Irisan bukti LPJ-05/06/09 menerima penautan PDF/JPG/PNG yang sudah diunggah melalui Drive ke folder bukti proyek yang ditetapkan pemilik. Pemilik/editor menautkan atau mengganti bukti pada transaksi draf sesuai izin server; viewer tidak mengakses panel bukti. Penautan tidak berarti verifikasi dan tidak mengubah keputusan pajak/netto terdahulu. Perubahan bukti memerlukan tinjauan ulang pemilik. Unggah langsung dari aplikasi dan arsip salinan final belum termasuk irisan ini.
 
-Pada irisan konfirmasi LPJ-05/06/09, pemilik meninjau seluruh pembayaran dan bukti sebelum mengonfirmasi transaksi pada proyek aktif. Server memeriksa ulang RAB, nominal, penilaian pajak, profil penerima, aturan dan bukti terkini. Satu pembayaran yang belum memenuhi syarat menahan seluruh transaksi. Konfirmasi menyimpan pelaku/waktu dan memindahkan nilai kwitansi ke total terkonfirmasi satu kali; percobaan ulang tidak menggandakan realisasi. Penerbitan nomor kwitansi dan finalisasi dokumen merupakan langkah berikutnya.
+Pada irisan konfirmasi LPJ-05/06/09, pemilik meninjau seluruh pembayaran dan bukti sebelum mengonfirmasi transaksi pada proyek aktif. Server memeriksa ulang RAB, nominal, penilaian pajak, profil penerima, aturan dan bukti terkini. Satu pembayaran yang belum memenuhi syarat menahan seluruh transaksi. Konfirmasi menyimpan pelaku/waktu dan memindahkan nilai kwitansi ke total terkonfirmasi satu kali; percobaan ulang tidak menggandakan realisasi.
+
+Pada irisan kwitansi LPJ-05/08/09, pemilik meninjau pembayaran terkonfirmasi dan menerbitkan satu kwitansi aktif per pembayaran. Nomor berurutan unik dalam proyek, dialokasikan atomik; retry tidak menerbitkan nomor kedua. Snapshot membekukan nominal, terbilang netto, tanggal pembayaran, identitas proyek/penerima, PPK dan Bendahara Pengeluaran. Perubahan master tidak mengubah kwitansi terbit. Anggota berizin membaca salinan cetaknya. Cetak A4 tersedia; pengesahan format resmi, arsip PDF final dan salinan bukti masih memerlukan tahap finalisasi.
 
 ## Batas lingkup
 

@@ -200,7 +200,12 @@ const DEPLOYMENT_HEADERS_ = {
     "status",
     "row_version",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "sequence_no",
+    "issued_by_user_id",
+    "template_version",
+    "document_snapshot",
+    "snapshot_digest"
   ],
   "tax_rule_versions": [
     "tax_rule_version_id",

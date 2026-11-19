@@ -99,7 +99,8 @@ function dispatch_(request, identify) {
       'participants.commit_import', 'participants.save', 'distributions.save', 'reports.preview',
       'transactions.list', 'transactions.save', 'transactions.preview_confirmation', 'transactions.confirm',
       'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
-      'taxes.list_rules', 'taxes.save_rule_version', 'attachments.list', 'attachments.get', 'attachments.link'];
+      'taxes.list_rules', 'taxes.save_rule_version', 'attachments.list', 'attachments.get', 'attachments.link',
+      'receipts.preview', 'receipts.issue', 'receipts.get'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -154,6 +155,13 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    if (request.action.startsWith('receipts.')) {
+      if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      const role = roleFor(request.project_id);
+      if (!role || (request.action !== 'receipts.get' && role !== 'OWNER')) return failure('FORBIDDEN', 'Hanya pemilik yang dapat menerbitkan kwitansi.');
+      return receiptRpc_(spreadsheetId, user, request);
+    }
 
     if (request.action.startsWith('attachments.')) {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');

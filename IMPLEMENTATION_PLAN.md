@@ -4,6 +4,8 @@ Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHI
 
 ## Progres 19 November 2026
 
+- Kwitansi bernomor (LPJ-05/08/09): RPC/UI preview, issue dan get tersedia setelah transaksi terkonfirmasi. Nomor per proyek, satu kwitansi aktif per pembayaran, snapshot/digest, terbilang netto, audit, batch atomik dan retry idempoten diperiksa. Total 50 tes dan build lulus; uji browser sintetis desktop/360 px serta inspeksi PDF A4 normal satu halaman/isian maksimum dua halaman lulus. Lima header tambahan disiapkan tanpa mengubah data lama. Pengesahan format institusi, arsip PDF final/salinan bukti, serta uji alur keuangan dan matriks akses Google sungguhan masih terbuka.
+
 - Konfirmasi transaksi LPJ-05/06/09 dipublikasikan dari commit `49e000a`: GitHub Pages dan CI berhasil, backend Apps Script versi 5 aktif pada URL yang sama. Sumber remote dicocokkan dengan commit sebelum publikasi, dan tiga kolom metadata dikonfirmasi tersedia. Endpoint mengembalikan `UNAUTHENTICATED` pada probe tanpa login.
 - Sebanyak 45 tes, build, dan uji browser sintetis desktop/360 px lulus pada irisan konfirmasi. Penilaian pajak lama tanpa penanda konteks perlu diverifikasi ulang sebelum konfirmasi. Uji alur keuangan dan matriks akses pada deployment Google sungguhan tetap belum ditutup.
 

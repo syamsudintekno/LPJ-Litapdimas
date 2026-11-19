@@ -133,7 +133,7 @@ Tambahkan `Transactions.gs` dan perbarui `Code.gs`. Gunakan proyek/spreadsheet s
 | `transactions` | `transaction_id, project_id, budget_item_id, activity_id, payment_date, expense_kind, description, status, row_version, created_at, updated_at, confirmed_by_user_id, confirmed_at` |
 | `payment_details` | `payment_detail_id, transaction_id, payee_id, receipt_amount, withheld_tax_amount, added_tax_amount, net_paid_amount, row_version, created_at, updated_at` |
 | `tax_assessments` | `tax_assessment_id, payment_detail_id, tax_rule_version_id, tax_kind, tax_treatment, tax_base_amount, amount, status, verified_by_user_id, verified_at, override_reason, decision_source_ref, evidence_attachment_id, evidence_row_version, evidence_drive_file_id, evidence_modified_at, rule_snapshot, row_version, created_at, updated_at, verification_context_digest` |
-| `receipts` | `receipt_id, payment_detail_id, project_id, receipt_no, issued_on, status, row_version, created_at, updated_at` |
+| `receipts` | `receipt_id, payment_detail_id, project_id, receipt_no, issued_on, status, row_version, created_at, updated_at, sequence_no, issued_by_user_id, template_version, document_snapshot, snapshot_digest` |
 
 Isi payee sintetis dengan UUID stabil, jenis `PERSON`, `ORGANIZATION`, atau `GROUP`, dan nama. Payee `PERSON` dapat merujuk `person_id` dari Master Personel. Pemilik melihat pilihan payee valid; anggota hanya melihat personel/peserta proyek dan payee yang sudah dipakai pada proyeknya. Profil pajak tidak ditampilkan ke browser. Pengelolaan payee melalui UI menyusul.
 
@@ -141,7 +141,7 @@ Sahkan satu RAB agar menjadi versi aktif. Set `TRANSACTIONS_ENABLED=true`, perba
 
 Uji retry setelah respons terputus: UUID/payload tetap sama dan tidak menambah transaksi atau pembayaran. Uji penyuntingan dua versi bersaing: versi lama ditolak tanpa menimpa perubahan terbaru. Rincian pembayaran juga diperiksa versinya; data yang sudah tertaut penilaian pajak, kwitansi atau distribusi tidak boleh disunting lewat alur ini. Setelah revisi RAB disahkan, draf lama tetap menunjuk item/versi sebelumnya; draf baru harus memilih versi aktif. Viewer hanya membaca dan ID lintas proyek ditolak.
 
-Potongan pada draf ini masih usulan sampai ditinjau melalui alur pajak di bawah. Pajak tambahan nonzero ditolak. Unggah langsung dari aplikasi, penerbitan kwitansi, setoran dan rekap tahap menyusul. Pengujian browser dengan login/RPC sintetis lulus untuk tambah/sunting draf, retry dengan UUID/payload yang sama, pemulihan konflik versi induk/pembayaran, penambahan/penghapusan penerima, pencarian, akses viewer, dan tampilan 360 px tanpa gulir horizontal. Tampilan desktop/mobile diperiksa melalui screenshot. Belum ada pembaruan atau pengujian deployment Google untuk fitur ini.
+Potongan pada draf ini masih usulan sampai ditinjau melalui alur pajak di bawah. Pajak tambahan nonzero ditolak. Unggah langsung dari aplikasi, setoran dan rekap tahap menyusul. Penerbitan kwitansi tersedia pada alur di bawah. Pengujian browser dengan login/RPC sintetis lulus untuk tambah/sunting draf, retry dengan UUID/payload yang sama, pemulihan konflik versi induk/pembayaran, penambahan/penghapusan penerima, pencarian, akses viewer, dan tampilan 360 px tanpa gulir horizontal. Tampilan desktop/mobile diperiksa melalui screenshot. Belum ada pembaruan atau pengujian deployment Google untuk fitur ini.
 
 ## Menyiapkan penilaian dan verifikasi pajak LPJ-06
 
@@ -234,3 +234,12 @@ Proyek A memakai ID `20000000-0000-4000-8000-000000000001` dan proyek B memakai 
 | Akses langsung ke berkas | Buka URL spreadsheet, folder bukti, dan berkas dummy sebagai pemilik lalu sebagai anggota A dan B. Pemilik dapat membukanya dan kedua anggota ditolak langsung. | Memerlukan akun Google | Belum dijalankan |
 
 Untuk GitHub Pages, uji ulang matriks otorisasi dari origin `github.io` memakai transport yang mendukung identitas Google di server. Catat hasil aktual dan keputusan transport di [arsitektur](../ARCHITECTURE.md).
+
+
+## Menyiapkan kwitansi bernomor (LPJ-05/08/09)
+
+Tambahkan `Receipts.gs`; perbarui `Code.gs`, `Transactions.gs`, `TransactionConfirmation.gs` dan `DeploymentSetup.gs`. Pada tab receipts lama dengan sembilan kolom, tambahkan tepat lima header di akhir J1:N1: `sequence_no, issued_by_user_id, template_version, document_snapshot, snapshot_digest`. Pertahankan header dan seluruh data lama. Baris kwitansi lama tanpa snapshot/sequence perlu rekonsiliasi tersendiri; jangan mengisinya dengan nilai rekaan. Tidak ada scope atau flag baru; gunakan TRANSACTIONS_ENABLED/TAXES_ENABLED yang sudah aktif.
+
+Publikasikan backend dan Pages. Pada transaksi terkonfirmasi, pemilik memilih **Tinjau kwitansi**, meninjau nominal/tanggal/penerima/PPK/bendahara, lalu **Terbitkan kwitansi**. Perubahan sumber atau preview kedaluwarsa memerlukan muat ulang. Bila hasil simpan belum diketahui, gunakan **Coba terbitkan kembali** dengan UUID/payload yang sama. Nomor berurutan per proyek berbentuk 0001/KWT/2026; tanggal mengikuti pembayaran. Contoh bruto Rp900.000 dan potongan Rp45.000 menghasilkan netto Rp855.000, terbilang delapan ratus lima puluh lima ribu rupiah. Anggota berizin dapat **Lihat kwitansi** dan mencetak snapshot tanpa hak menerbitkan.
+
+Lima tes kwitansi melengkapi total 50 tes: terbilang sampai batas integer aman, otorisasi, retry, dua penerima/nomor, sumber berubah, lock/batch gagal dan snapshot tetap setelah master/bukti berubah. Uji browser sintetis mencakup gagal muat/penghalang, konflik, respons terputus, fokus/Escape, viewer/editor dan layar 360 px. PDF sintetis normal satu halaman A4, isian maksimum dua halaman dengan tanda tangan utuh dan nomor pada halaman lanjutan. Isi PDF diperiksa terhadap nominal/terbilang/NIP dan ketiadaan tombol UI. Pengesahan format resmi, arsip PDF final/salinan bukti serta alur keuangan Google sungguhan tetap belum diverifikasi.

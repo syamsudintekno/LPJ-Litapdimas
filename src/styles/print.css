@@ -3,4 +3,7 @@
   body[data-print-activity="true"] { margin: 0; background: white; }
   body[data-print-activity="true"] > :not([data-activity-print-root]) { display: none !important; }
   [data-activity-print-root] [data-print-controls] { display: none !important; }
+  body[data-print-receipt="true"] { margin: 0; background: white; }
+  body[data-print-receipt="true"] > :not([data-receipt-print-root]) { display: none !important; }
+  [data-receipt-print-root] [data-print-controls] { display: none !important; }
 }

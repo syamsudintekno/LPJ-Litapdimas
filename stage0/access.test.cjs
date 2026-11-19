@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs', 'Receipts.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -130,7 +130,7 @@ function setup() {
     assert.equal(response.mimeType, 'application/json');
     return JSON.parse(response.content);
   }
-  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache, driveFiles, driveFolders, driveReads, taxAmount: context.taxAmount_};
+  return {rpc, post, owner, editor, viewer, projectA, projectB, sheets, reads, properties, claims, verifier, writes, cache, driveFiles, driveFolders, driveReads, taxAmount: context.taxAmount_, rupiahWords: context.rupiahWords_};
 }
 
 function setupLogbook() {
@@ -497,6 +497,107 @@ test('konfirmasi menolak token kedaluwarsa, proyek tidak aktif, RAB asing, serta
     const payload = env.confirmationPayload();
     change(env);
     assert.equal(env.confirm(payload).error.code, 'CONFLICT');
+  }
+});
+
+function setupReceipts() {
+  const env = setupConfirmation();
+  const required = ['receipt_id', 'payment_detail_id', 'project_id', 'receipt_no', 'issued_on', 'status', 'sequence_no', 'issued_by_user_id',
+    'template_version', 'document_snapshot', 'snapshot_digest', 'row_version', 'created_at', 'updated_at'];
+  env.sheets.receipts[0] = required;
+  const previewReceipt = (paymentId = env.payment.payment_detail_id, account = env.owner, project = env.projectA) =>
+    env.rpc(account, 'receipts.preview', project, {payload: {payment_detail_id: paymentId}});
+  const issuePayload = (data = previewReceipt().data, paymentId = env.payment.payment_detail_id) => ({payment_detail_id: paymentId, preview_token: data.preview_token,
+    expected_transaction_row_version: data.transaction_row_version, expected_payment_row_version: data.payment_row_version});
+  const issue = (payload = issuePayload(), id = randomUUID(), account = env.owner, project = env.projectA) => env.rpc(account, 'receipts.issue', project, {request_id: id, payload});
+  const get = (receiptId, account = env.owner, project = env.projectA) => env.rpc(account, 'receipts.get', project, {payload: {receipt_id: receiptId}});
+  return {...env, previewReceipt, issuePayload, issue, get};
+}
+
+test('terbilang rupiah menjaga nol, belasan, seratus, seribu dan batas integer aman tanpa pembulatan', () => {
+  const {rupiahWords} = setup();
+  for (const [amount, expected] of [[0, 'nol rupiah'], [11, 'sebelas rupiah'], [15, 'lima belas rupiah'], [100, 'seratus rupiah'],
+    [101, 'seratus satu rupiah'], [1000, 'seribu rupiah'], [1100, 'seribu seratus rupiah'], [855000, 'delapan ratus lima puluh lima ribu rupiah'],
+    [1000000000000, 'satu triliun rupiah'], [9007199254740991, 'sembilan kuadriliun tujuh triliun seratus sembilan puluh sembilan miliar dua ratus lima puluh empat juta tujuh ratus empat puluh ribu sembilan ratus sembilan puluh satu rupiah']]) {
+    assert.equal(rupiahWords(amount), expected);
+  }
+  assert.throws(() => rupiahWords(Number.MAX_SAFE_INTEGER + 1));
+  assert.throws(() => rupiahWords(-1));
+  assert.throws(() => rupiahWords(1.5));
+});
+
+test('kwitansi hanya diterbitkan pemilik setelah konfirmasi, menyimpan netto/pejabat dan mengulang hasil tanpa nomor ganda', () => {
+  const env = setupReceipts();
+  const {previewReceipt, issuePayload, issue, get, editor, viewer, projectB, owner, verify, decision, confirm, sheets, writes, list} = env;
+  sheets.people[0].push('nip'); sheets.people.slice(1).forEach((row, index) => row.push(index === 0 ? '001234567890123456' : ''));
+  assert.equal(previewReceipt(undefined, editor).error.code, 'FORBIDDEN');
+  assert.equal(previewReceipt(undefined, viewer).error.code, 'FORBIDDEN');
+  assert.equal(previewReceipt(undefined, owner, projectB).error.code, 'NOT_FOUND');
+  assert.equal(previewReceipt().data.can_issue, false);
+  assert.equal(verify(decision()).ok, true);
+  assert.equal(confirm().ok, true);
+  const preview = previewReceipt().data;
+  assert.deepEqual(preview.blockers, []);
+  assert.equal(preview.document.payment.net_paid_amount, 855000);
+  assert.equal(preview.document.payment.amount_in_words, 'delapan ratus lima puluh lima ribu rupiah');
+  assert.equal(preview.document.signers.ppk.person_id, sheets.project_people[1][2]);
+  assert.equal(preview.document.signers.ppk.nip, '001234567890123456');
+  const payload = issuePayload(preview), id = randomUUID();
+  assert.equal(issue(payload, randomUUID(), editor).error.code, 'FORBIDDEN');
+  const issued = issue(payload, id);
+  assert.equal(issued.data.receipt.receipt_no, '0001/KWT/2023');
+  assert.equal(issued.data.receipt.issued_on, '2026-11-18');
+  const batches = writes.batches;
+  assert.deepEqual(issue(payload, id), issued);
+  assert.equal(writes.batches, batches);
+  assert.equal(issue(payload).error.code, 'CONFLICT');
+  assert.equal(issue({...payload, expected_payment_row_version: payload.expected_payment_row_version + 1}, id).error.code, 'CONFLICT');
+  assert.equal(get(issued.data.receipt.receipt_id, viewer).error.code, 'FORBIDDEN');
+  sheets.project_members.push([randomUUID(), env.projectA, sheets.users[3][0], 'VIEWER', '']);
+  assert.deepEqual(get(issued.data.receipt.receipt_id, viewer).data, issued.data);
+  assert.equal(get(issued.data.receipt.receipt_id, owner, projectB).error.code, 'NOT_FOUND');
+  assert.equal(list().data.transactions[0].payments[0].receipt.receipt_no, '0001/KWT/2023');
+  assert.equal(list().data.confirmed_total_amount, 900000);
+});
+
+test('snapshot kwitansi tetap sama setelah master/profil/bukti berubah dan mendeteksi snapshot yang rusak', () => {
+  const env = setupReceipts();
+  assert.equal(env.verify(env.decision()).ok, true); assert.equal(env.confirm().ok, true);
+  const issued = env.issue().data;
+  env.sheets.people[1][2] = 'Nama master berubah'; env.sheets.projects[1][2] = 'Judul proyek berubah';
+  env.sheets.payees[1][3] = 'Nama penerima berubah'; env.driveFiles.get(env.driveId).fail = true;
+  assert.deepEqual(env.get(issued.receipt.receipt_id).data, issued);
+  const column = env.sheets.receipts[0].indexOf('document_snapshot');
+  const document = JSON.parse(env.sheets.receipts[1][column]); document.payment.net_paid_amount = 1;
+  env.sheets.receipts[1][column] = JSON.stringify(document);
+  assert.equal(env.get(issued.receipt.receipt_id).error.code, 'TEMPORARY_FAILURE');
+});
+
+test('dua pembayaran dari pratinjau sejajar mendapat nomor berbeda; kegagalan batch dan lock tidak menghabiskan nomor', () => {
+  const env = setupReceipts();
+  const {sheets, verify, decision, rpc, owner, projectA, created, previewReceipt, issuePayload, issue, writes} = env;
+  const person = [...sheets.people[1]]; person[0] = randomUUID(); sheets.people.push(person);
+  const payee = [...sheets.payees[1]]; payee[0] = randomUUID(); payee[2] = person[0]; sheets.payees.push(payee);
+  const secondId = randomUUID(); sheets.payment_details.push([secondId, created.transaction_id, payee[0], 100000, 5000, 0, 95000, 1]);
+  assert.equal(verify(decision()).ok, true);
+  const second = rpc(owner, 'taxes.preview', projectA, {payload: {payment_detail_id: secondId}}).data;
+  assert.equal(verify({...decision(second), payment_detail_id: secondId}).ok, true);
+  assert.equal(env.confirm().ok, true);
+  const one = issuePayload(previewReceipt().data), two = issuePayload(previewReceipt(secondId).data, secondId);
+  writes.locked = true; assert.equal(issue(one).error.code, 'TEMPORARY_FAILURE'); writes.locked = false;
+  writes.fail = true; const before = JSON.stringify(sheets); const id = randomUUID();
+  assert.equal(issue(one, id).error.code, 'TEMPORARY_FAILURE'); assert.equal(JSON.stringify(sheets), before); writes.fail = false;
+  assert.equal(issue(one, id).data.receipt.receipt_no, '0001/KWT/2023');
+  assert.equal(issue(two).data.receipt.receipt_no, '0002/KWT/2023');
+});
+
+test('penerbitan menolak perubahan pejabat/bukti setelah pratinjau, pejabat hilang/ganda dan token kedaluwarsa', () => {
+  for (const change of [env => {env.sheets.people[1][2] = 'PPK berubah';}, env => {env.driveFiles.get(env.driveId).modified_at = '2026-11-19T00:00:00Z';},
+    env => {env.cache.clear();}, env => {env.sheets.project_people.splice(1, 1);}, env => {env.sheets.project_people.push([...env.sheets.project_people[1]]);},
+  ]) {
+    const env = setupReceipts(); assert.equal(env.verify(env.decision()).ok, true); assert.equal(env.confirm().ok, true);
+    const payload = env.issuePayload(); change(env);
+    assert.equal(env.issue(payload).error.code, 'CONFLICT'); assert.equal(env.sheets.receipts.length, 1);
   }
 });
 
