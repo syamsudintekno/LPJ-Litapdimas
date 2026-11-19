@@ -9,8 +9,8 @@ Arahan pengguna 19 November 2026: personel yang ditempel ke Sheets dan keterbaca
 - [x] Unggah bukti PDF/JPG/PNG langsung.
 - [x] Pratinjau/cetak/finalisasi paket laporan, snapshot dan salinan bukti privat.
 - [x] Penerima pembayaran, akses anggota, audit, cadangan lengkap dan pemulihan.
-- [x] Dokumentasi, helper migrasi tambahan, build, commit/push; sumber 24 berkas disiapkan di Apps Script (`5d1893b`). Build-only CI berhasil, tes tidak dijalankan.
-- [ ] Pemilik menjalankan prepareWorkspace dan menyetujui izin Drive tulis.
-- [ ] Aktifkan deployment Apps Script baru dan publikasikan Pages setelah izin siap. Versi aktif lama dipertahankan selama menunggu.
+- [x] Dokumentasi, helper migrasi tambahan, build, commit/push; sumber 24 berkas Apps Script (`a5b5654`). Build-only CI berhasil, tes tidak dijalankan.
+- [x] Pengguna menjalankan prepareWorkspace dan melaporkan ok:true; izin Drive tulis serta penyiapan skema dilakukan.
+- [x] Apps Script versi 10 aktif pada URL yang sama dan [Pages berhasil dipublikasikan](https://github.com/syamsudintekno/LPJ-Litapdimas/actions/runs/44538452602). [Build-only CI](https://github.com/syamsudintekno/LPJ-Litapdimas/actions/runs/44538279712) berhasil. Tidak ada pengujian penerimaan yang dijalankan pada irisan ini.
 
 Pengesahan format LPJ, pemeriksaan perlakuan pajak, uji penerimaan/akses dan uji pulih dikerjakan pengguna. Menyediakan tombol/fungsi bukan bukti hasil pengujian.
