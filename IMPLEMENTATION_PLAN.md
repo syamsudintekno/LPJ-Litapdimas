@@ -2,6 +2,11 @@
 
 Status: rancangan tahap pengerjaan berdasarkan [PRD](PRD.md), [arsitektur](ARCHITECTURE.md), dan [panduan UI](DESIGN.md).
 
+## Progres 19 November 2026
+
+- Konfirmasi transaksi LPJ-05/06/09 dipublikasikan dari commit `49e000a`: GitHub Pages dan CI berhasil, backend Apps Script versi 5 aktif pada URL yang sama. Sumber remote dicocokkan dengan commit sebelum publikasi, dan tiga kolom metadata dikonfirmasi tersedia. Endpoint mengembalikan `UNAUTHENTICATED` pada probe tanpa login.
+- Sebanyak 45 tes, build, dan uji browser sintetis desktop/360 px lulus pada irisan konfirmasi. Penilaian pajak lama tanpa penanda konteks perlu diverifikasi ulang sebelum konfirmasi. Uji alur keuangan dan matriks akses pada deployment Google sungguhan tetap belum ditutup.
+
 ## Progres 18 November 2026
 
 - Tahap 0: login dan akses dasar tiga akun dilaporkan berhasil. Uji penolakan akses Google sungguhan dan izin langsung berkas masih tertunda; tahap belum ditutup.
