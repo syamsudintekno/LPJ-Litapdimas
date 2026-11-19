@@ -21,4 +21,7 @@ test('CSV dosen melewati subheader dan menjaga nol awal pada NIP', async () => {
 test('NIP numerik dari Excel ditandai untuk koreksi', () => {
   const [row] = mapPeopleRows([['NAMA', 'NIP'], ['Dosen Sintetis', 123456789012345678]]);
   assert.equal(row.nip, '[simpan kolom sebagai teks]');
+  const [identifiers] = mapPeopleRows([['person_id', 'person_kind', 'display_name', 'nip', 'nim'], [12345, 'MAHASISWA', 'Mahasiswa Sintetis', '', 123456]]);
+  assert.equal(identifiers.person_id, '[simpan kolom sebagai teks]');
+  assert.equal(identifiers.nim, '[simpan kolom sebagai teks]');
 });

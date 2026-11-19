@@ -1426,6 +1426,20 @@ test('impor personel memvalidasi pratinjau, menjaga NIP sebagai teks, dan menceg
   const {data} = preview();
   assert.deepEqual(data.summary, {valid: 1, duplicate: 0, correction: 1});
   assert.deepEqual(data.results.map(row => row.source_row), [3, 5]);
+  assert.match(data.results[1].message, /NIP harus berisi 5–30 digit/);
+  for (const [changes, expected] of [
+    [{nip: '[simpan kolom sebagai teks]'}, /NIP terbaca sebagai angka Excel.*Text.*sumber asli/],
+    [{display_name: ''}, /Isi nama lengkap pada kolom display_name/],
+    [{person_kind: 'LAINNYA'}, /Pilih person_kind/],
+    [{nip: '', nim: 'A!'}, /NIM harus berisi/],
+    [{person_id: 'invalid-id'}, /person_id harus berupa UUID/],
+    [{nip: '', nim: '', person_id: ''}, /Isi sedikitnya satu identitas/],
+  ]) {
+    const correction = preview(owner, [{source_row: 2, ...fields, ...changes}]).data.results[0];
+    assert.equal(correction.status, 'CORRECTION');
+    assert.match(correction.message, expected);
+    if (changes.nip === undefined) assert.doesNotMatch(correction.message, /NIP harus/);
+  }
   assert.equal(writes.batches, 0);
   const request_id = randomUUID();
   const commit = (batch = rows) => rpc(owner, 'people.commit_import', undefined, {

@@ -48,6 +48,8 @@ Unduh tab sumber sebagai CSV, atau gunakan XLSX dengan tab sumber di posisi pert
 
 Gunakan data dosen asli setelah deployment mempunyai verifikasi identitas produksi dan penyimpanan berakses terbatas. Data sumber dan hasil impor disimpan di luar repositori.
 
+Untuk Excel, pilih format **Text sebelum mengisi** NIP/NIM/ID. Jika sudah tersimpan sebagai Number dan digit/nol awal berubah, isi ulang dari sumber asli setelah memilih Text; perubahan format saja tidak memulihkan angka. Pratinjau menyebut masalah nama, kategori, UUID, NIP atau NIM secara spesifik. Nomor numerik Excel dan notasi ilmiah ditolak, bukan dikonversi diam-diam. Ketentuan impor tetap: NIP teks 5–30 digit, NIM teks 3–40 karakter alfanumerik/tanda hubung, dan UUID valid bila person_id diisi.
+
 ## Menyiapkan uji versi RAB LPJ-03
 
 Tambahkan `Budgets.gs` pada deployment sintetis yang sudah menyiapkan tab `projects`, `audit_log`, dan `mutation_requests`. Buat tab di bawah dan tetapkan `BUDGETS_ENABLED=true` setelah skema siap.

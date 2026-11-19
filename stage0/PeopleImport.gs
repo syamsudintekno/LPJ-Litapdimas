@@ -95,6 +95,20 @@ function peopleImportKeys_(row) {
     .map(field => field + ':' + String(row[field]).trim().toLowerCase());
 }
 
+function peopleImportErrors_(row) {
+  const errors = [];
+  if (!row.display_name) errors.push('Isi nama lengkap pada kolom display_name.');
+  if (!['DOSEN', 'PEGAWAI', 'MAHASISWA', 'EKSTERNAL'].includes(row.person_kind)) errors.push('Pilih person_kind: DOSEN, PEGAWAI, MAHASISWA, atau EKSTERNAL.');
+  if (!row.person_id && !row.nip && !row.nim) errors.push('Isi sedikitnya satu identitas: person_id, NIP, atau NIM.');
+  for (const [field, label] of [['person_id', 'ID personel'], ['nip', 'NIP'], ['nim', 'NIM']]) {
+    if (row[field] === '[simpan kolom sebagai teks]') errors.push(label + ' terbaca sebagai angka Excel. Ubah format kolom menjadi Text, lalu isi ulang dari sumber asli dan unggah kembali. Mengubah format saja tidak mengembalikan digit atau nol awal yang hilang.');
+    else if (field === 'person_id' && row.person_id && !PROJECT_UUID_.test(row.person_id)) errors.push('person_id harus berupa UUID yang valid. Kosongkan jika NIP atau NIM sudah diisi.');
+    else if (field === 'nip' && row.nip && !/^\d{5,30}$/.test(row.nip)) errors.push('NIP harus berisi 5–30 digit tanpa spasi atau notasi ilmiah, disimpan sebagai teks.');
+    else if (field === 'nim' && row.nim && !/^[a-z0-9][a-z0-9-]{2,39}$/i.test(row.nim)) errors.push('NIM harus berisi 3–40 karakter huruf, angka, atau tanda hubung, diawali huruf/angka dan disimpan sebagai teks.');
+  }
+  return errors;
+}
+
 function peopleImportPlan_(spreadsheetId, rows) {
   const people = rows_(spreadsheetId, 'people', ['person_id', 'person_kind', 'display_name'], IMPORT_PERSON_FIELDS_.slice(3));
   const existing = new Map();
@@ -114,11 +128,10 @@ function peopleImportPlan_(spreadsheetId, rows) {
     const matches = new Set(keys.flatMap(key => existing.get(key) ?? []));
     let status = 'VALID';
     let message = '';
-    if (!row.display_name || !['DOSEN', 'PEGAWAI', 'MAHASISWA', 'EKSTERNAL'].includes(row.person_kind) ||
-        !keys.length || (row.person_id && !PROJECT_UUID_.test(row.person_id)) ||
-        (row.nip && !/^\d{5,30}$/.test(row.nip)) || (row.nim && !/^[a-z0-9][a-z0-9-]{2,39}$/i.test(row.nim))) {
+    const errors = peopleImportErrors_(row);
+    if (errors.length) {
       status = 'CORRECTION';
-      message = 'Isi nama, kategori, dan ID yang valid. NIP harus tersedia sebagai digit utuh.';
+      message = errors.join(' ');
     } else if (keys.some(key => counts.get(key) > 1)) {
       status = 'CORRECTION';
       message = 'ID, NIP, atau NIM muncul beberapa kali dalam berkas.';

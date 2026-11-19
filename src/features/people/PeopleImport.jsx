@@ -71,7 +71,8 @@ export function PeopleImport({endpoint, token, expire, onCommitted}) {
       </label>
       <button className={layout.secondary} disabled={pending || !file} type="submit"><Eye size={16} /> Pratinjau</button>
     </form>
-    <p className={styles.help}>Untuk Excel, simpan kolom NIP, NIM, dan ID sebagai teks. Gunakan lembar pertama untuk data yang akan diimpor.</p>
+    <p className={styles.help}>Untuk Excel, pilih format Text pada kolom NIP, NIM, dan ID sebelum mengisi data. Hindari format Number agar nol awal dan digit panjang tetap utuh. Gunakan lembar pertama untuk data yang akan diimpor.</p>
+    <p className={styles.help}>Jika nomor sudah berubah, isi ulang dari sumber asli setelah memilih Text. Mengubah format saja tidak memulihkan digit yang hilang.</p>
     {pending && <p role="status">Memproses berkas…</p>}
     {error && <p role="alert" className={styles.importError}>{error}</p>}
     {result && <p role="status">{result.imported} personel diimpor, {result.duplicate} duplikat, {result.correction} perlu koreksi.</p>}
