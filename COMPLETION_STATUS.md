@@ -9,6 +9,8 @@ Arahan pengguna 19 November 2026: personel yang ditempel ke Sheets dan keterbaca
 - [x] Unggah bukti PDF/JPG/PNG langsung.
 - [x] Pratinjau/cetak/finalisasi paket laporan, snapshot dan salinan bukti privat.
 - [x] Penerima pembayaran, akses anggota, audit, cadangan lengkap dan pemulihan.
-- [ ] Dokumentasi, migrasi tambahan, build, commit/push dan publikasi.
+- [x] Dokumentasi, helper migrasi tambahan, build, commit/push; sumber 24 berkas disiapkan di Apps Script (`5d1893b`). Build-only CI berhasil, tes tidak dijalankan.
+- [ ] Pemilik menjalankan prepareWorkspace dan menyetujui izin Drive tulis.
+- [ ] Aktifkan deployment Apps Script baru dan publikasikan Pages setelah izin siap. Versi aktif lama dipertahankan selama menunggu.
 
 Pengesahan format LPJ, pemeriksaan perlakuan pajak, uji penerimaan/akses dan uji pulih dikerjakan pengguna. Menyediakan tombol/fungsi bukan bukti hasil pengujian.
