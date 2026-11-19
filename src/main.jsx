@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ArrowRight, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, FolderOpen, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, ShieldCheck, Trash2, Users} from './components/ui/Icons.jsx';
 import {callProjectRpc, loadConfig, loadGoogleSignIn} from './rpc.js';
@@ -18,6 +18,10 @@ import './styles/globals.css';
 import styles from './Home.module.css';
 
 const roleLabels = {OWNER: 'Pemilik', EDITOR: 'Editor', VIEWER: 'Baca saja'};
+const FinanceWorkspace = lazy(() => import('./features/operations/FinanceWorkspace.jsx').then(module => ({default: module.FinanceWorkspace})));
+const ArchiveWorkspace = lazy(() => import('./features/operations/ArchiveWorkspace.jsx').then(module => ({default: module.ArchiveWorkspace})));
+const AdministrationWorkspace = lazy(() => import('./features/operations/AdministrationWorkspace.jsx').then(module => ({default: module.AdministrationWorkspace})));
+const ProjectEditor = lazy(() => import('./features/operations/ProjectEditor.jsx').then(module => ({default: module.ProjectEditor})));
 
 function Brand() {
   return <div className={styles.brand}>
@@ -263,6 +267,12 @@ function Workspace({endpoint, token, expire, onSignOut}) {
           endpoint={endpoint} token={token} expire={expire} project={detail.data.project} />}
         {detail.data.transactions_enabled && <StageRealization key={detail.data.project.project_id}
           endpoint={endpoint} token={token} expire={expire} project={detail.data.project} />}
+        {detail.data.workspace_ready ? <Suspense fallback={<p role="status">Memuat pengelolaan proyek…</p>}>
+          {detail.data.access_role === 'OWNER' && <ProjectEditor api={{endpoint, token, expire, projectId: selected}} onSaved={updateProjects} />}
+          <FinanceWorkspace key={'finance-' + selected} api={{endpoint, token, expire, projectId: selected}} />
+          <ArchiveWorkspace key={'archive-' + selected} api={{endpoint, token, expire, projectId: selected}} owner={detail.data.access_role === 'OWNER'} />
+          {detail.data.access_role === 'OWNER' && <AdministrationWorkspace key={'admin-' + selected} api={{endpoint, token, expire, projectId: selected}} personnel={detail.data.personnel} />}
+        </Suspense> : detail.data.access_role === 'OWNER' && <p>Untuk mengaktifkan fitur lengkap, jalankan prepareWorkspace di editor Apps Script dengan akun pemilik, setujui akses Drive, lalu muat ulang aplikasi.</p>}
       </div>}
     </section>
     {canManagePeople && <PeopleDirectory endpoint={endpoint} token={token} expire={expire}

@@ -1,4 +1,4 @@
-function activityReport_(spreadsheetId, request) {
+function activityReport_(spreadsheetId, request, alreadyLocked = false) {
   const {request_id, project_id, payload} = request;
   const fail = (code, message) => failure_(request_id, code, message);
   if (PropertiesService.getScriptProperties().getProperty('ACTIVITY_REPORTS_ENABLED') !== 'true') {
@@ -8,7 +8,7 @@ function activityReport_(spreadsheetId, request) {
     return fail('VALIDATION_ERROR', 'Pilih paket dokumen dan ID kegiatan yang valid.');
   }
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return fail('TEMPORARY_FAILURE', 'Data kegiatan sedang diproses. Coba lagi.');
+  if (!alreadyLocked && !lock.tryLock(5000)) return fail('TEMPORARY_FAILURE', 'Data kegiatan sedang diproses. Coba lagi.');
   try {
     const project = rows_(spreadsheetId, 'projects', ['project_id', 'title', 'fiscal_year', 'project_code'], ['row_version'])
       .find(row => row.project_id === project_id);
@@ -45,6 +45,6 @@ function activityReport_(spreadsheetId, request) {
     return {ok: true, request_id, data: {is_final: false, template_version: 'activity-draft-v1',
       generated_at: new Date().toISOString(), project, activity, agenda, logbook, participants, distributions: groups}};
   } finally {
-    lock.releaseLock();
+    if (!alreadyLocked) lock.releaseLock();
   }
 }

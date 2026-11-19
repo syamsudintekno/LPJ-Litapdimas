@@ -84,3 +84,12 @@ Cetak A4 menyembunyikan shell dan toolbar, mempertahankan label bruto/potongan/n
 Bagian detail proyek memakai StageRealization, CSS Modules, Inter dan ikon Kubai dari adapter bersama. Pemilik/editor/viewer dapat memilih tahap dari wizard dan memuat ulang. Tampilkan label Draf rekap terkini, batas inklusif dan waktu WIB. Ringkasan memisahkan plafon, target kumulatif, bruto, potongan, netto, kurang/lebih dari target dan sisa/kelebihan plafon. Jelaskan transaksi yang dikecualikan dan bahwa setoran tidak menambah realisasi. Tahap FINALIZED tetap diberi penjelasan bahwa tampilan ini bukan salinan arsip final.
 
 Pergantian tahap menghilangkan nominal tahap sebelumnya selama loading. Kegagalan menampilkan pesan dan aksi muat ulang. Pencarian tujuan/item/tanggal dan halaman delapan baris hanya menyaring rincian; ringkasan tetap seluruh tahap. Tabel semantik mempunyai caption/header dan wrapper fokus berlabel yang dapat digulir pada ponsel tanpa melebarkan halaman. Angka rupiah tidak terpotong; tujuan/item panjang membungkus. Pilihan tahap tetap dapat diakses dengan keyboard saat pemuatan.
+
+
+## Pengelolaan v1 lengkap
+
+Fitur lengkap ditampilkan sesudah workspace_ready dari server. Tombol Sunting identitas, tim, dan tahap membuka wizard berisi versi terbaru; snapshot final tidak ditimpa melalui wizard. Bagian Pencairan, setoran, dan distribusi memisahkan penerimaan dana dari belanja, menampilkan potongan/disetor/sisa dan alokasi eksplisit, serta menyediakan penautan distribusi tanpa memasukkan nilai belanja baru. Unggah langsung memiliki label PDF/JPG/PNG 20 MiB dan status privat/belum diverifikasi.
+
+Bagian Paket dan arsip LPJ memakai pemilih tahap, daftar penghalang, iframe pratinjau HTML tersanitasi, label draf yang ikut tercetak, pernyataan pemeriksaan format, dan aksi Finalkan dan simpan PDF privat. Versi final dapat dibuka dari snapshot, dicetak dan diunduh bersama salinan bukti. Akses, audit, dan cadangan hanya pemilik: penerima pembayaran, email/peran anggota, audit berhalaman, cadangan lengkap dan pemulihan ke salinan baru. Pemulihan meminta pernyataan eksplisit tentang salinan baru serta menampilkan tautan hasil dan petunjuk pengaktifan.
+
+Seluruh panel menggunakan CSS Modules, token, Inter dan adapter Kubai. Form berlabel, fieldset dikunci saat simpan/hasil tidak pasti, request dipertahankan untuk retry, loading/gagal terlihat, daftar membungkus teks pada ponsel dan tabel tetap dalam wrapper. Panel baru dimuat secara lazy. Build bukan pemeriksaan visual; pengguna melakukan pengujian UI sesuai arahan 19 November 2026.

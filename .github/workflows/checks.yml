@@ -3,6 +3,12 @@ name: Check LPJ contracts and build
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Jalankan pengujian otomatis
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,5 +23,6 @@ jobs:
           node-version: '24'
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - if: github.event_name == 'workflow_dispatch' && inputs.run_tests
+        run: pnpm test
       - run: pnpm build

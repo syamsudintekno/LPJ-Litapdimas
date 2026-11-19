@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs', 'Receipts.gs', 'StageReports.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs', 'Receipts.gs', 'StageReports.gs', 'Operations.gs', 'ProjectManagement.gs', 'Finance.gs', 'Uploads.gs', 'Archives.gs', 'Administration.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {

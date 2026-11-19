@@ -18,7 +18,7 @@ function doPost(event) {
   let body;
   try {
     const raw = event?.postData?.contents;
-    if (typeof raw !== 'string' || raw.length > 500000) throw new Error();
+    if (typeof raw !== 'string' || raw.length > 29000000) throw new Error();
     body = JSON.parse(raw);
   } catch {
     return json_(failure_(null, 'VALIDATION_ERROR', 'Permintaan uji tidak valid.'));
@@ -100,7 +100,10 @@ function dispatch_(request, identify) {
       'transactions.list', 'transactions.save', 'transactions.preview_confirmation', 'transactions.confirm',
       'stage0.write_probe', 'stage0.tax_probe', 'taxes.preview', 'taxes.verify',
       'taxes.list_rules', 'taxes.save_rule_version', 'attachments.list', 'attachments.get', 'attachments.link',
-      'receipts.preview', 'receipts.issue', 'receipts.get'];
+      'receipts.preview', 'receipts.issue', 'receipts.get', 'projects.edit_data', 'projects.update', 'finance.list',
+      'disbursements.save', 'tax_remittances.save', 'distributions.link', 'attachments.upload',
+      'reports.package_preview', 'reports.finalize', 'reports.list_final', 'reports.get_final', 'reports.download',
+      'audit.list', 'access.save', 'backups.create', 'backups.restore', 'payees.save'];
     if (!request || request.api_version !== 1 || !actions.includes(request.action) ||
         typeof requestId !== 'string' || !requestId) {
       return failure('VALIDATION_ERROR', 'Permintaan uji tidak valid.');
@@ -155,6 +158,27 @@ function dispatch_(request, identify) {
       return member && member.revoked_at === '' &&
         ['EDITOR', 'VIEWER'].includes(member.project_role) ? member.project_role : null;
     };
+
+    const operations = ['projects.edit_data', 'projects.update', 'finance.list', 'disbursements.save', 'tax_remittances.save', 'distributions.link',
+      'attachments.upload', 'reports.package_preview', 'reports.finalize', 'reports.list_final', 'reports.get_final', 'reports.download',
+      'audit.list', 'access.save', 'backups.create', 'backups.restore', 'payees.save'];
+    if (operations.includes(request.action)) {
+      if (!opUuid_(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
+      const role = roleFor(request.project_id), readActions = ['finance.list', 'reports.list_final', 'reports.get_final', 'reports.download'];
+      if (!role || (!readActions.includes(request.action) && request.action !== 'attachments.upload' && role !== 'OWNER') ||
+          (request.action === 'attachments.upload' && role === 'VIEWER')) return failure('FORBIDDEN', 'Tindakan ini memerlukan hak pemilik atau akses proyek yang sesuai.');
+      if (PropertiesService.getScriptProperties().getProperty('WORKSPACE_READY') !== 'true') return failure('TEMPORARY_FAILURE', 'Pemilik perlu menjalankan prepareWorkspace dari editor Apps Script untuk menyiapkan fitur lengkap.');
+      if (request.action === 'projects.edit_data') return projectEditData_(spreadsheetId, request);
+      if (request.action === 'projects.update') return projectUpdate_(spreadsheetId, user, request);
+      if (request.action === 'payees.save') return payeeSave_(spreadsheetId, user, request);
+      if (request.action === 'finance.list') return financeList_(spreadsheetId, request, role);
+      if (['disbursements.save', 'tax_remittances.save', 'distributions.link'].includes(request.action)) return financeWrite_(spreadsheetId, user, request);
+      if (request.action === 'attachments.upload') return uploadEvidence_(spreadsheetId, user, request, role);
+      if (request.action.startsWith('reports.')) return archiveRpc_(spreadsheetId, user, request, role);
+      if (request.action === 'audit.list') return adminList_(spreadsheetId, request);
+      if (request.action === 'access.save') return accessSave_(spreadsheetId, user, request);
+      return backupRpc_(spreadsheetId, user, request);
+    }
 
     if (request.action.startsWith('receipts.')) {
       if (typeof request.project_id !== 'string' || !PROJECT_UUID_.test(request.project_id)) return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
@@ -285,12 +309,13 @@ function dispatch_(request, identify) {
       display_name: people.find(person => person.person_id === row.person_id)?.display_name ?? '',
     }));
     return success({project, access_role: roleFor(project.project_id), personnel,
+      workspace_ready: PropertiesService.getScriptProperties().getProperty('WORKSPACE_READY') === 'true',
       budgets_enabled: PropertiesService.getScriptProperties().getProperty('BUDGETS_ENABLED') === 'true',
       activities_enabled: PropertiesService.getScriptProperties().getProperty('ACTIVITIES_ENABLED') === 'true',
       logbook_enabled: PropertiesService.getScriptProperties().getProperty('LOGBOOK_ENABLED') === 'true',
       transactions_enabled: PropertiesService.getScriptProperties().getProperty('TRANSACTIONS_ENABLED') === 'true'});
   } catch (error) {
-    return failure('TEMPORARY_FAILURE', 'Data uji tidak dapat dibaca. Periksa konfigurasi.');
+    return failure('TEMPORARY_FAILURE', 'Permintaan belum dapat diselesaikan. Periksa konfigurasi, izin layanan, dan ketersediaan data; coba kembali dengan permintaan yang sama.');
   }
 }
 

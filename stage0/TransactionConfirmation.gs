@@ -1,5 +1,5 @@
 function transactionConfirmationContext_(spreadsheetId, projectId, transactionId, purpose = 'CONFIRM') {
-  if (!['CONFIRM', 'RECEIPT'].includes(purpose)) throw new Error('Tujuan pemeriksaan transaksi tidak valid.');
+  if (!['CONFIRM', 'RECEIPT', 'FINAL'].includes(purpose)) throw new Error('Tujuan pemeriksaan transaksi tidak valid.');
   const read = (name, fields, optional = []) => rows_(spreadsheetId, name, fields, optional);
   const unique = (rows, key) => {if (new Set(rows.map(row => row[key])).size !== rows.length) throw new Error('ID sumber konfirmasi ganda.'); return rows;};
   const project = unique(read('projects', ['project_id', 'status', 'official_ceiling_amount', 'row_version']), 'project_id').find(row => row.project_id === projectId);
@@ -10,7 +10,7 @@ function transactionConfirmationContext_(spreadsheetId, projectId, transactionId
   const blockers = [];
   if (project.status !== 'ACTIVE' || !Number.isSafeInteger(project.official_ceiling_amount) || project.official_ceiling_amount < 1 ||
       !Number.isSafeInteger(project.row_version) || project.row_version < 1) blockers.push('Proyek harus aktif dengan plafon resmi dan versi yang valid.');
-  if (transaction.status !== (purpose === 'RECEIPT' ? 'CONFIRMED' : 'DRAFT')) blockers.push(purpose === 'RECEIPT' ? 'Transaksi harus sudah terkonfirmasi.' : 'Transaksi harus berstatus draf.');
+  if (transaction.status !== (purpose === 'CONFIRM' ? 'DRAFT' : 'CONFIRMED')) blockers.push(purpose === 'CONFIRM' ? 'Transaksi harus berstatus draf.' : 'Transaksi harus sudah terkonfirmasi.');
   if (!Number.isSafeInteger(transaction.row_version) || transaction.row_version < 1 || !validProjectDate_(transaction.payment_date) ||
       !budgetText_(transaction.description, 1000) || !EXPENSE_KINDS_.includes(transaction.expense_kind) || !amounts ||
       payments.some(row => !PROJECT_UUID_.test(row.payment_detail_id) || !Number.isSafeInteger(row.row_version) || row.row_version < 1)) blockers.push('Rincian transaksi atau nominal pembayaran tidak konsisten.');
@@ -32,7 +32,7 @@ function transactionConfirmationContext_(spreadsheetId, projectId, transactionId
   const receipts = read('receipts', ['payment_detail_id']).filter(row => payments.some(payment => payment.payment_detail_id === row.payment_detail_id));
   const allocations = read('tax_remittance_allocations', ['tax_assessment_id']).filter(row => assessments.some(assessment => assessment.tax_assessment_id === row.tax_assessment_id));
   const distributions = read('distributions', ['transaction_id']).filter(row => row.transaction_id === transactionId);
-  if ((purpose !== 'RECEIPT' && receipts.length) || allocations.length || distributions.length) blockers.push('Transaksi sudah tertaut kwitansi, setoran, atau distribusi; tinjau melalui alur rekonsiliasi.');
+  if (purpose === 'CONFIRM' && (receipts.length || allocations.length || distributions.length)) blockers.push('Transaksi sudah tertaut kwitansi, setoran, atau distribusi; tinjau melalui alur rekonsiliasi.');
   const files = new Map();
   const details = payments.map(payment => {
     const payee = payees.find(row => row.payee_id === payment.payee_id);

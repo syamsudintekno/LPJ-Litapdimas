@@ -1,5 +1,5 @@
 import {ArrowRight, ChevronLeft, Close, FolderOpen, Plus, RefreshCw, Save, Trash2} from '../../components/ui/Icons.jsx';
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useId, useRef, useState} from 'react';
 import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
 import styles from './ProjectWizard.module.css';
@@ -11,13 +11,14 @@ const optionalRoles = ['Anggota Peneliti', 'Mahasiswa', 'Pejabat Tambahan'];
 const money = new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', maximumFractionDigits: 0});
 const percent = new Intl.NumberFormat('id-ID', {style: 'percent', maximumFractionDigits: 2});
 
-export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
+export function ProjectWizard({endpoint, token, expire, onClose, onSaved, initial}) {
+  const headingId = useId();
   const [step, setStep] = useState(0);
-  const [identity, setIdentity] = useState({title: '', project_code: '', fiscal_year: '', official_ceiling_amount: ''});
-  const [assignments, setAssignments] = useState(() => [...teamRoles, ...officialRoles]
+  const [identity, setIdentity] = useState(() => initial ? Object.fromEntries(['title', 'project_code', 'fiscal_year', 'official_ceiling_amount'].map(key => [key, String(initial.project[key] ?? '')])) : {title: '', project_code: '', fiscal_year: '', official_ceiling_amount: ''});
+  const [assignments, setAssignments] = useState(() => initial ? initial.personnel.map(row => ({...row, key: crypto.randomUUID()})) : [...teamRoles, ...officialRoles]
     .filter(role => !optionalRoles.includes(role))
     .map(role => ({key: crypto.randomUUID(), assignment_role: role, person: null})));
-  const [stages, setStages] = useState(() => [
+  const [stages, setStages] = useState(() => initial ? initial.stages.map(row => ({...row, key: crypto.randomUUID(), target: String(row.target_bps / 100)})) : [
     {key: crypto.randomUUID(), label: 'Tahap 1', target: '70', cutoff_date: ''},
     {key: crypto.randomUUID(), label: 'Tahap akhir', target: '100', cutoff_date: ''},
   ]);
@@ -57,12 +58,14 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
   }, [endpoint, token, expire, query, personnelStep, searchVersion]);
 
   const payload = {
+    ...(initial ? {expected_row_version: initial.project.row_version} : {}),
     project: {...identity, title: identity.title.trim(), project_code: identity.project_code.trim(),
       fiscal_year: Number(identity.fiscal_year), official_ceiling_amount: Number(identity.official_ceiling_amount)},
-    personnel: assignments.map(row => ({assignment_role: row.assignment_role, ...(row.assignment_role === 'Mahasiswa'
+    personnel: assignments.map(row => ({assignment_role: row.assignment_role, ...(initial && row.student_source_id ? {student_source_id: row.student_source_id, expected_student_row_version: row.expected_student_row_version} : {}), ...(row.assignment_role === 'Mahasiswa'
       ? {student: {display_name: (row.student?.display_name || '').trim(), nip: (row.student?.nip || '').trim(), nim: (row.student?.nim || '').trim()}}
       : {person_id: row.person?.person_id})})),
     stages: stages.map((row, index) => ({
+      ...(row.report_stage_id ? {report_stage_id: row.report_stage_id, expected_row_version: row.row_version} : {}),
       sequence_no: index + 1, label: row.label.trim(), target_bps: Math.round(Number(row.target) * 100), cutoff_date: row.cutoff_date,
     })),
   };
@@ -82,7 +85,7 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
     setAttemptPending(true);
     setSaveError('');
     try {
-      const result = await callProjectRpc(endpoint, token, 'projects.save', undefined, controller.signal,
+      const result = await callProjectRpc(endpoint, token, initial ? 'projects.update' : 'projects.save', initial?.project.project_id, controller.signal,
         attempt.current.payload, attempt.current.requestId);
       if (!controller.signal.aborted) onSaved(result.project_id);
     } catch (error) {
@@ -164,9 +167,9 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
     </label>;
   }
 
-  return <section className={layout.panel} aria-labelledby="wizard-heading">
+  return <section className={layout.panel} aria-labelledby={headingId}>
     <div className={layout.detailHeader}>
-      <h2 id="wizard-heading" tabIndex={-1} ref={heading}><FolderOpen size={20} /> Proyek baru · {steps[step]}</h2>
+      <h2 id={headingId} tabIndex={-1} ref={heading}><FolderOpen size={20} /> {initial ? 'Sunting proyek' : 'Proyek baru'} · {steps[step]}</h2>
       <button type="button" className={layout.secondary} disabled={saving || attemptPending} onClick={onClose}><Close size={16} /> Tutup</button>
     </div>
     <ol className={styles.steps} aria-label="Langkah wizard">
@@ -218,7 +221,7 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved}) {
         {step > 0 && <button type="button" className={layout.secondary} disabled={saving || attemptPending}
           onClick={() => {setSaveError(''); setStep(step - 1);}}><ChevronLeft size={16} /> Kembali</button>}
         <button type="submit" className={layout.primary} disabled={saving}>
-          {step === 4 ? <Save size={16} /> : <ArrowRight size={16} />} {saving ? 'Menyimpan…' : step === 4 ? 'Simpan draf' : 'Lanjut'}
+          {step === 4 ? <Save size={16} /> : <ArrowRight size={16} />} {saving ? 'Menyimpan…' : step === 4 ? initial ? 'Simpan perubahan proyek' : 'Simpan draf' : 'Lanjut'}
         </button>
       </div>
     </form>

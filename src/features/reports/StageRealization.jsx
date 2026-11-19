@@ -58,9 +58,10 @@ export function StageRealization({endpoint, token, expire, project}) {
         <div><dt>{data.ceiling_remaining_amount >= 0 ? 'Sisa plafon' : 'Melebihi plafon'}</dt><dd>{money(Math.abs(data.ceiling_remaining_amount))}</dd></div>
         <div><dt>Potongan pajak dalam bruto</dt><dd>{money(data.totals.withheld_tax_amount)}</dd></div>
         <div><dt>Jumlah diterima (netto)</dt><dd>{money(data.totals.net_paid_amount)}</dd></div>
+        {data.funding && <><div><dt>Dana aktual diterima sampai batas</dt><dd>{money(data.funding.received_total_amount)}</dd></div><div><dt>Pajak disetor sampai batas</dt><dd>{money(data.funding.remitted_total_amount)}</dd></div><div><dt>Potongan tahap belum disetor</dt><dd>{money(data.funding.unremitted_withheld_amount)}</dd></div></>}
       </dl>
       <p role="status">{data.transaction_count} transaksi terkonfirmasi dihitung. Dikecualikan: {data.excluded.draft_count} draf dan {data.excluded.void_count} dibatalkan sampai batas; {data.excluded.later_confirmed_count} terkonfirmasi setelah batas.</p>
-      <p>Penerbitan kwitansi dan setoran pajak tidak menambah realisasi kedua kali. Catatan penerimaan dana aktual serta rekonsiliasi setoran belum tersedia pada rekap ini.</p>
+      <p>Penerbitan kwitansi dan setoran pajak tidak menambah realisasi kedua kali. Penerimaan dana aktual serta setoran ditampilkan terpisah dari belanja bruto.</p>
       <label className={styles.field}><span><Search size={16} /> Cari rincian realisasi</span>
         <input type="search" maxLength={120} value={query} onChange={event => {setQuery(event.target.value); setPage(0);}} placeholder="Tujuan, item RAB, atau YYYY-MM-DD" />
       </label>

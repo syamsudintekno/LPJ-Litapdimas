@@ -15,7 +15,7 @@ export async function callProjectRpc(endpoint, token, action, projectId, signal,
     method: 'POST',
     credentials: 'omit',
     body: JSON.stringify({id_token: token, request}),
-    signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(['reports.finalize', 'backups.create', 'backups.restore', 'attachments.upload'].includes(action) ? 300000 : 60000)]),
   });
   if (!http.ok) throw new Error('Layanan proyek tidak dapat dihubungi.');
   const response = await http.json();

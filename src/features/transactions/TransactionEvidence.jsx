@@ -4,6 +4,7 @@ import {callProjectRpc} from '../../rpc.js';
 import layout from '../../Home.module.css';
 import fields from './TransactionWorkspace.module.css';
 import styles from './TransactionEvidence.module.css';
+import {UploadEvidence} from '../operations/shared.jsx';
 
 function driveId(value) {
   const input = value.trim();
@@ -118,6 +119,8 @@ function EvidencePanel({endpoint, token, expire, projectId, transactionId, disab
       </ul>
       {data.can_link ? <button className={layout.secondary} type="button" disabled={locked || Boolean(draft)} onClick={() => edit(null)}><Plus size={16} /> Tautkan bukti</button>
         : <p>Bukti tidak dapat diubah pada status transaksi atau proyek ini.</p>}
+      {data.can_link && <UploadEvidence api={{endpoint, token, expire, projectId}} kind="PAYMENT_PROOF" transactionId={transactionId} transactionVersion={data.transaction_row_version}
+        disabled={locked || Boolean(draft)} onUploaded={() => {setRevision(value => value + 1); onLinked();}} />}
     </>}
     {draft && <form className={fields.form} onSubmit={link}>
       <h5 ref={formHeading} tabIndex={-1}>{draft.attachment_id ? 'Ganti berkas bukti' : 'Tautkan berkas bukti'}</h5>

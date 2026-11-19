@@ -1,12 +1,12 @@
 // Read-only stage preview. Receipt numbers and tax remittances never add realization.
-function stageReport_(spreadsheetId, request) {
+function stageReport_(spreadsheetId, request, alreadyLocked = false) {
   const {request_id, project_id, payload} = request;
   const fail = (code, message) => failure_(request_id, code, message);
   if (PropertiesService.getScriptProperties().getProperty('TRANSACTIONS_ENABLED') !== 'true') return fail('TEMPORARY_FAILURE', 'Rekap transaksi belum diaktifkan.');
   if (payload?.document_kind !== 'STAGE_REALIZATION' || (payload.report_stage_id !== undefined &&
       (typeof payload.report_stage_id !== 'string' || !PROJECT_UUID_.test(payload.report_stage_id)))) return fail('VALIDATION_ERROR', 'Pilih ID tahap laporan yang valid.');
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return fail('TEMPORARY_FAILURE', 'Data laporan sedang diproses. Coba lagi.');
+  if (!alreadyLocked && !lock.tryLock(5000)) return fail('TEMPORARY_FAILURE', 'Data laporan sedang diproses. Coba lagi.');
   try {
     const read = (name, fields) => rows_(spreadsheetId, name, fields);
     const unique = (rows, key) => {
@@ -58,12 +58,21 @@ function stageReport_(spreadsheetId, request) {
         transaction_row_version: transaction.row_version, payment_count: selected.length, ...amounts.totals});
     }
     details.sort((a, b) => a.payment_date.localeCompare(b.payment_date) || a.transaction_id.localeCompare(b.transaction_id));
+    let funding = null;
+    if (PropertiesService.getScriptProperties().getProperty('WORKSPACE_READY') === 'true') {
+      const finance = financeContext_(spreadsheetId, project_id);
+      const remittances = finance.remittances.filter(row => row.paid_at <= stage.cutoff_date);
+      const assessments = finance.outstanding.filter(row => details.some(tx => tx.transaction_id === row.transaction_id));
+      const allocations = finance.allocations.filter(row => assessments.some(item => item.tax_assessment_id === row.tax_assessment_id) && remittances.some(item => item.tax_remittance_id === row.tax_remittance_id));
+      funding = {received_total_amount: opSum_(finance.disbursements.filter(row => row.received_date <= stage.cutoff_date), 'received_amount'),
+        remitted_total_amount: opSum_(remittances), unremitted_withheld_amount: opSum_(assessments) - opSum_(allocations)};
+    }
     return {ok: true, request_id, data: {document_kind: 'STAGE_REALIZATION', is_final: false, generated_at: new Date().toISOString(),
       project, stages, stage, target_amount: target, totals, transaction_count: details.length,
       target_difference_amount: totals.receipt_amount - target, ceiling_remaining_amount: ceiling - totals.receipt_amount,
       excluded: {draft_count: transactions.filter(row => row.status === 'DRAFT' && row.payment_date <= stage.cutoff_date).length,
         void_count: transactions.filter(row => row.status === 'VOID' && row.payment_date <= stage.cutoff_date).length,
         later_confirmed_count: transactions.filter(row => row.status === 'CONFIRMED' && row.payment_date > stage.cutoff_date).length},
-      transactions: details}};
-  } finally {lock.releaseLock();}
+      funding, transactions: details}};
+  } finally {if (!alreadyLocked) lock.releaseLock();}
 }

@@ -43,6 +43,8 @@ Irisan rekap tahap LPJ-07/08/09 menyediakan pratinjau terkini bagi pembaca proye
 
 ## Batas lingkup
 
+Penyelesaian v1 melengkapi penyuntingan identitas/tim/tahap sebelum arsip final, pencatatan penerimaan dana aktual dengan bukti, setoran dengan alokasi potongan asal, penautan distribusi tanpa belanja ganda, unggah bukti langsung, paket PDF final beserta snapshot/salinan bukti, pengelolaan akses anggota, audit, cadangan lengkap dan pemulihan ke salinan baru. Pemulihan tidak menimpa workspace aktif. Pemilik menyatakan telah mencocokkan format resmi sebelum finalisasi. Pengujian penerimaan, pemeriksaan perlakuan pajak dan pengesahan format dikerjakan pengguna sesuai arahan 19 November 2026; keberhasilan build/publikasi bukan pengesahan hasilnya.
+
 Di luar v1: portal publik, pencairan dana dari aplikasi, integrasi Litapdimas/Coretax/perbankan, pengiriman SPT, tanda tangan elektronik tersertifikasi, OCR, akses offline, dan pemilikan hibah lintas institusi. Perluasan fitur dimulai dari revisi PRD yang disetujui. Data produksi, bukti, dan daftar personel tidak masuk repositori publik.
 
 ## Keputusan yang perlu divalidasi
