@@ -39,6 +39,8 @@ Pada irisan konfirmasi LPJ-05/06/09, pemilik meninjau seluruh pembayaran dan buk
 
 Pada irisan kwitansi LPJ-05/08/09, pemilik meninjau pembayaran terkonfirmasi dan menerbitkan satu kwitansi aktif per pembayaran. Nomor berurutan unik dalam proyek, dialokasikan atomik; retry tidak menerbitkan nomor kedua. Snapshot membekukan nominal, terbilang netto, tanggal pembayaran, identitas proyek/penerima, PPK dan Bendahara Pengeluaran. Perubahan master tidak mengubah kwitansi terbit. Anggota berizin membaca salinan cetaknya. Cetak A4 tersedia; pengesahan format resmi, arsip PDF final dan salinan bukti masih memerlukan tahap finalisasi.
 
+Irisan rekap tahap LPJ-07/08/09 menyediakan pratinjau terkini bagi pembaca proyek. Tahap berasal dari skema wizard; target dihitung dari plafon dan basis point, dibulatkan ke rupiah terdekat (setengah ke atas). Rekap kumulatif mencakup transaksi CONFIRMED sejak awal proyek sampai tanggal batas inklusif. Pembayaran multi-penerima dijumlahkan di bawah satu transaksi; draf, VOID dan transaksi sesudah batas dikecualikan. Bruto, potongan, netto, selisih target dan sisa plafon terlihat terpisah. Kwitansi terbit atau setoran pajak tidak menjadi belanja tambahan. Status FINALIZED pada tahap tidak menjadikan pratinjau sumber terkini sebagai arsip final. Pencatatan penerimaan dana aktual, rekonsiliasi setoran dan finalisasi paket tetap langkah lanjutan.
+
 ## Batas lingkup
 
 Di luar v1: portal publik, pencairan dana dari aplikasi, integrasi Litapdimas/Coretax/perbankan, pengiriman SPT, tanda tangan elektronik tersertifikasi, OCR, akses offline, dan pemilikan hibah lintas institusi. Perluasan fitur dimulai dari revisi PRD yang disetujui. Data produksi, bukti, dan daftar personel tidak masuk repositori publik.

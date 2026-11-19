@@ -199,6 +199,7 @@ function dispatch_(request, identify) {
         return failure('VALIDATION_ERROR', 'ID proyek tidak valid.');
       }
       if (!roleFor(request.project_id)) return failure('FORBIDDEN', 'Akun tidak memiliki akses pratinjau proyek ini.');
+      if (request.payload?.document_kind === 'STAGE_REALIZATION') return stageReport_(spreadsheetId, request);
       return activityReport_(spreadsheetId, request);
     }
 

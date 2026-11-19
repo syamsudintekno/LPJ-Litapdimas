@@ -6,7 +6,7 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 
 const read = name => readFileSync(path.join(__dirname, name), 'utf8');
-const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs', 'Receipts.gs'].map(read).join('\n');
+const source = ['Code.gs', 'Projects.gs', 'PeopleImport.gs', 'Budgets.gs', 'Activities.gs', 'Logbook.gs', 'Participants.gs', 'ActivityReports.gs', 'Transactions.gs', 'Taxes.gs', 'TaxRules.gs', 'Attachments.gs', 'TransactionConfirmation.gs', 'Receipts.gs', 'StageReports.gs'].map(read).join('\n');
 const tables = ['users', 'project_members', 'projects', 'people', 'project_people'];
 
 function setup() {
@@ -599,6 +599,128 @@ test('penerbitan menolak perubahan pejabat/bukti setelah pratinjau, pejabat hila
     const payload = env.issuePayload(); change(env);
     assert.equal(env.issue(payload).error.code, 'CONFLICT'); assert.equal(env.sheets.receipts.length, 1);
   }
+});
+
+function setupStageReport() {
+  const env = setupConfirmation();
+  const {sheets, projectA, projectB, rpc, editor} = env;
+  const stageA = randomUUID(), finalStage = randomUUID(), foreignStage = randomUUID();
+  sheets.report_stages = [['report_stage_id', 'project_id', 'sequence_no', 'label', 'target_bps', 'cutoff_date', 'status', 'row_version'],
+    [stageA, projectA, 1, 'Tahap 70%', 7000, '2026-11-18', 'DRAFT', 1], [finalStage, projectA, 2, 'Tahap 100%', 10000, '2026-12-31', 'DRAFT', 1],
+    [foreignStage, projectB, 1, 'Tahap B', 10000, '2026-12-31', 'DRAFT', 1]];
+  const set = (table, row, key, value) => {sheets[table][row][sheets[table][0].indexOf(key)] = value;};
+  const preview = (stage = stageA, account = editor, project = projectA) => rpc(account, 'reports.preview', project,
+    {payload: {document_kind: 'STAGE_REALIZATION', ...(stage === undefined ? {} : {report_stage_id: stage})}});
+  return {...env, stageA, finalStage, foreignStage, preview, set};
+}
+
+test('rekap tahap kumulatif memakai bruto sekali, batas inklusif, multi-penerima dan mengecualikan draf/void/lintas proyek', () => {
+  const env = setupStageReport();
+  const {sheets, set, preview, projectA, projectB, itemA, itemB, payeeA, payeeB, stageA, finalStage, writes} = env;
+  set('projects', 1, 'official_ceiling_amount', 17500000);
+  set('transactions', 1, 'status', 'CONFIRMED');
+  const add = (project, item, date, status, amounts) => {
+    const id = randomUUID();
+    sheets.transactions.push([id, project, item, '', date, 'HONOR', 'Transaksi sintetis ' + status, status, 1]);
+    amounts.forEach(([gross, tax], i) => sheets.payment_details.push([randomUUID(), id, i ? payeeB : payeeA, gross, tax, 0, gross - tax, 1]));
+  };
+  add(projectA, itemA, '2026-11-01', 'CONFIRMED', [[400000, 20000], [600000, 30000]]);
+  add(projectA, itemA, '2026-11-19', 'CONFIRMED', [[3000000, 150000]]);
+  add(projectA, itemA, '2026-11-18', 'DRAFT', [[2000000, 0]]);
+  add(projectA, itemA, '2026-11-18', 'VOID', [[2000000, 0]]);
+  add(projectB, itemB, '2026-11-18', 'CONFIRMED', [[2000000, 0]]);
+  sheets.tax_remittances = [['tax_remittance_id', 'amount'], [randomUUID(), 95000]];
+  sheets.receipts.push([randomUUID(), sheets.payment_details[1][0], 'ISSUED']);
+  const before = JSON.stringify(sheets), batches = writes.batches;
+  const first = preview(stageA).data;
+  assert.equal(first.is_final, false);
+  assert.equal(first.target_amount, 12250000);
+  assert.equal(first.totals.receipt_amount, 1900000);
+  assert.equal(first.totals.withheld_tax_amount, 95000);
+  assert.equal(first.totals.net_paid_amount, 1805000);
+  assert.equal(first.transaction_count, 2);
+  assert.equal(first.transactions[0].payment_count, 2);
+  assert.deepEqual(first.excluded, {draft_count: 1, void_count: 1, later_confirmed_count: 1});
+  assert.equal(first.target_difference_amount, -10350000);
+  const final = preview(finalStage).data;
+  assert.equal(final.totals.receipt_amount, 4900000);
+  assert.equal(final.transaction_count, 3);
+  assert.equal(final.ceiling_remaining_amount, 12600000);
+  assert.equal(JSON.stringify(sheets), before);
+  assert.equal(writes.batches, batches);
+});
+
+test('rekap tahap menjaga hak terkini, tahap asing, flag dan pemisahan preview kegiatan', () => {
+  const env = setupStageReport();
+  const {preview, owner, viewer, projectA, foreignStage, rpc, sheets, properties} = env;
+  assert.equal(preview(undefined, owner).ok, true);
+  assert.equal(preview(undefined, viewer).error.code, 'FORBIDDEN');
+  sheets.project_members.push([randomUUID(), projectA, sheets.users[3][0], 'VIEWER', '']);
+  assert.equal(preview(undefined, viewer).ok, true);
+  sheets.project_members.at(-1)[4] = '2026-11-19T00:00:00Z';
+  assert.equal(preview(undefined, viewer).error.code, 'FORBIDDEN');
+  assert.equal(preview(foreignStage).error.code, 'NOT_FOUND');
+  assert.equal(preview('not-uuid').error.code, 'VALIDATION_ERROR');
+  assert.equal(rpc(owner, 'reports.preview', projectA, {payload: {document_kind: 'UNKNOWN'}}).ok, false);
+  properties.TRANSACTIONS_ENABLED = 'false';
+  assert.equal(preview().error.code, 'TEMPORARY_FAILURE');
+});
+
+test('rekap menolak nominal/ID/FK/status tidak konsisten, total overflow dan lock sibuk', () => {
+  for (const corrupt of [
+    e => {e.sheets.transactions.push([...e.sheets.transactions[1]]);},
+    e => {e.sheets.payment_details.push([...e.sheets.payment_details[1]]);},
+    e => {e.set('transactions', 1, 'payment_date', '2026-02-30');},
+    e => {e.set('transactions', 1, 'status', 'UNKNOWN');},
+    e => {e.set('payment_details', 1, 'net_paid_amount', 123);},
+    e => {e.set('transactions', 1, 'budget_item_id', e.itemB);},
+    e => {e.set('budget_versions', 1, 'status', 'DRAFT');},
+    e => {e.sheets.payment_details.splice(1, 1);},
+    e => {e.writes.locked = true;},
+    e => {
+      const row = [...e.sheets.transactions[1]]; row[0] = randomUUID(); e.sheets.transactions.push(row);
+      e.set('payment_details', 1, 'receipt_amount', Number.MAX_SAFE_INTEGER); e.set('payment_details', 1, 'withheld_tax_amount', 0); e.set('payment_details', 1, 'net_paid_amount', Number.MAX_SAFE_INTEGER);
+      const p = [...e.sheets.payment_details[1]]; p[0] = randomUUID(); p[1] = row[0]; e.sheets.payment_details.push(p);
+    },
+  ]) {
+    const env = setupStageReport(); env.set('transactions', 1, 'status', 'CONFIRMED'); corrupt(env);
+    assert.equal(env.preview().error.code, 'TEMPORARY_FAILURE');
+  }
+});
+
+test('rekap menolak skema tahap cacat dan proyek lama tanpa plafon; mendukung target 60% dan pembulatan aman', () => {
+  for (const corrupt of [
+    e => {e.sheets.report_stages[1][4] = 10001;},
+    e => {e.sheets.report_stages[2][4] = 9000;},
+    e => {e.sheets.report_stages[2][5] = '2026-11-01';},
+    e => {e.sheets.report_stages[1][2] = 2;},
+    e => {e.sheets.report_stages[1][7] = '';},
+    e => {e.set('projects', 1, 'official_ceiling_amount', '');},
+  ]) {const e = setupStageReport(); corrupt(e); assert.equal(e.preview().error.code, 'TEMPORARY_FAILURE');}
+  const e = setupStageReport(); e.sheets.report_stages[1][4] = 6000;
+  e.set('projects', 1, 'official_ceiling_amount', 17500000);
+  assert.equal(e.preview().data.target_amount, 10500000);
+  e.sheets.report_stages[1][4] = 5000; e.set('projects', 1, 'official_ceiling_amount', 1);
+  assert.equal(e.preview().data.target_amount, 1);
+  e.set('projects', 1, 'official_ceiling_amount', Number.MAX_SAFE_INTEGER);
+  e.sheets.report_stages[1][4] = 7000;
+  const expected = Number((BigInt(Number.MAX_SAFE_INTEGER) * 7000n + 5000n) / 10000n);
+  assert.equal(e.preview().data.target_amount, expected);
+  assert.equal(e.preview(e.finalStage).data.target_amount, Number.MAX_SAFE_INTEGER);
+});
+
+test('rekap kosong dan proyek arsip tetap preview sumber terkini, RAB superseded tetap dirujuk', () => {
+  const e = setupStageReport();
+  assert.equal(e.preview().data.transaction_count, 0);
+  assert.equal(e.preview().data.totals.receipt_amount, 0);
+  e.set('transactions', 1, 'status', 'CONFIRMED');
+  e.set('budget_versions', 1, 'status', 'SUPERSEDED');
+  e.set('projects', 1, 'status', 'ARCHIVED'); e.sheets.report_stages[1][6] = 'FINALIZED';
+  const r = e.preview().data;
+  assert.equal(r.is_final, false); assert.equal(r.stage.status, 'FINALIZED');
+  assert.equal(r.totals.receipt_amount, 900000); assert.equal(r.totals.net_paid_amount, 855000);
+  assert.equal(JSON.stringify(r).includes('private-profile'), false);
+  assert.equal(JSON.stringify(r).includes('drive_file_id'), false);
 });
 
 function setupRuleEditor() {

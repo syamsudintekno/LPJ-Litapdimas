@@ -1,0 +1,22 @@
+.workspace { display: grid; min-width: 0; gap: 16px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-border); }
+.workspace p, .workspace h3 { overflow-wrap: anywhere; }
+.workspace h3, .field span { display: flex; align-items: center; gap: 8px; }
+.workspace h3 { margin: 0; font-size: 16px; }
+.context { color: var(--color-muted); font-size: 14px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px; }
+.summary div { padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); }
+.summary dt { font-size: 14px; color: var(--color-muted); }
+.summary dd { font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.field { display: grid; min-width: 0; gap: 4px; font-size: 14px; font-weight: 600; }
+.field input, .field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 16px; font-weight: 400; }
+.error { color: var(--color-danger); }
+.tableWrap { min-width: 0; max-width: 100%; overflow: auto; border: 1px solid var(--color-border); border-radius: 8px; }
+.tableWrap table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px; }
+.tableWrap caption { padding: 12px; text-align: left; font-weight: 600; }
+.tableWrap th, .tableWrap td { padding: 12px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.tableWrap td:first-child { max-width: 340px; min-width: 220px; overflow-wrap: anywhere; }
+.tableWrap td:nth-child(2) { max-width: 220px; overflow-wrap: anywhere; }
+.tableWrap td:nth-child(n+3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tableWrap small { display: block; margin-top: 4px; color: var(--color-muted); }

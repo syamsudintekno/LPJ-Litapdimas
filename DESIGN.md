@@ -76,3 +76,10 @@ Skala jarak 4, 8, 12, 16, 24, 32, 48 px. Radius elemen 8 px, panel 12 px. Ukuran
 ReceiptPreview memakai CSS Modules, Inter dan ikon Kubai dekoratif pada toolbar dengan label teks. Pemilik membuka Tinjau kwitansi setelah transaksi terkonfirmasi; pembaca proyek membuka Lihat kwitansi yang sudah terbit. Dialog memuat penghalang, loading/gagal/retry, draf jelas sebelum nomor terbit, dan salinan snapshot sesudahnya. Escape/fokus kembali tersedia; simpan/hasil tidak pasti mengunci tutup, muat ulang dan cetak sampai retry terselesaikan. Konflik meminta tinjauan baru.
 
 Cetak A4 menyembunyikan shell dan toolbar, mempertahankan label bruto/potongan/netto dan terbilang netto dari server, serta menampilkan PPK, Bendahara Pengeluaran, penerima dan NIP teks opsional. Blok tanda tangan tidak terpecah. Isian normal satu halaman; isian maksimum boleh dua halaman, dengan nomor pada footer halaman lanjutan. Pratinjau tidak mengganti pengesahan format institusi atau membuat arsip PDF final.
+
+
+## Realisasi per tahap (LPJ-07/08/09)
+
+Bagian detail proyek memakai StageRealization, CSS Modules, Inter dan ikon Kubai dari adapter bersama. Pemilik/editor/viewer dapat memilih tahap dari wizard dan memuat ulang. Tampilkan label Draf rekap terkini, batas inklusif dan waktu WIB. Ringkasan memisahkan plafon, target kumulatif, bruto, potongan, netto, kurang/lebih dari target dan sisa/kelebihan plafon. Jelaskan transaksi yang dikecualikan dan bahwa setoran tidak menambah realisasi. Tahap FINALIZED tetap diberi penjelasan bahwa tampilan ini bukan salinan arsip final.
+
+Pergantian tahap menghilangkan nominal tahap sebelumnya selama loading. Kegagalan menampilkan pesan dan aksi muat ulang. Pencarian tujuan/item/tanggal dan halaman delapan baris hanya menyaring rincian; ringkasan tetap seluruh tahap. Tabel semantik mempunyai caption/header dan wrapper fokus berlabel yang dapat digulir pada ponsel tanpa melebarkan halaman. Angka rupiah tidak terpotong; tujuan/item panjang membungkus. Pilihan tahap tetap dapat diakses dengan keyboard saat pemuatan.
