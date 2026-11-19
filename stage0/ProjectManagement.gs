@@ -73,7 +73,10 @@ function projectUpdate_(spreadsheetId, user, request) {
         if (!before || before.row_version !== stage.expected_row_version) return opError_('Tahap berubah. Muat ulang wizard.', 'CONFLICT');
         if (before.row_version !== '' && (!Number.isSafeInteger(before.row_version) || before.row_version < 1)) return opError_('Versi tahap tidak valid.', 'CONFLICT');
         updates.push(['report_stages', before.report_stage_id, {...value, row_version: (before.row_version || 0) + 1}]);
-      } else (adds.report_stages ||= []).push({report_stage_id: Utilities.getUuid(), project_id: project.project_id, status: 'DRAFT', ...stamp, ...value});
+      } else {
+        if (!adds.report_stages) adds.report_stages = [];
+        adds.report_stages.push({report_stage_id: Utilities.getUuid(), project_id: project.project_id, status: 'DRAFT', ...stamp, ...value});
+      }
     }
     const oldAssignments = rows_(spreadsheetId, 'project_people', ['project_person_id', 'project_id']).filter(row => row.project_id === project.project_id);
     deletes.push(...oldAssignments.map(row => ['project_people', row.project_person_id]));
