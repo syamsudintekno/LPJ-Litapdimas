@@ -46,7 +46,7 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved, initia
     const timer = setTimeout(() => {
       callProjectRpc(endpoint, token, 'people.search', undefined, controller.signal, {query: query.trim()})
         .then(data => {
-          if (!controller.signal.aborted) setPeople(data);
+          if (!controller.signal.aborted) setPeople({...data, people: data.people.map(person => ({...person, person_id: String(person.person_id)}))});
         })
         .catch(error => {
           if (controller.signal.aborted) return;
@@ -136,12 +136,12 @@ export function ProjectWizard({endpoint, token, expire, onClose, onSaved, initia
             <button type="button" className={layout.secondary} onClick={() => setAssignments(items => items.filter(item => item.key !== row.key))}><Trash2 size={16} /> Hapus Mahasiswa</button>
           </fieldset>;
           const matches = people?.people ?? [];
-          const options = row.person && !matches.some(item => item.person_id === row.person.person_id)
+          const options = row.person && !matches.some(item => String(item.person_id) === String(row.person.person_id))
             ? [row.person, ...matches] : matches;
           return <div className={styles.fields} key={row.key}>
             <label>{role}
-              <select required value={row.person?.person_id ?? ''} onChange={event => {
-                const person = options.find(item => item.person_id === event.target.value) ?? null;
+              <select required value={row.person ? String(row.person.person_id) : ''} onChange={event => {
+                const person = options.find(item => String(item.person_id) === event.target.value) ?? null;
                 setAssignments(items => items.map(item => item.key === row.key ? {...item, person} : item));
               }}>
                 <option value="">Pilih personel</option>
